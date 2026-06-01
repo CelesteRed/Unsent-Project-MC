@@ -1,0 +1,28 @@
+name: UnsentPlugin
+version: '1.0.0'
+main: com.unsentplugin.UnsentPlugin
+api-version: '26.1.2'
+description: Write anonymous unsent messages rendered as in-game maps.
+
+commands:
+  unsent:
+    description: Send an unsent message to a name.
+    usage: /unsent <name> <message>
+    permission: unsent.use
+    aliases: []
+  unsentread:
+    description: Read all unsent messages for a name.
+    usage: /unsentread <name>
+    permission: unsent.read
+    aliases: []
+
+permissions:
+  unsent.use:
+    description: Allows sending unsent messages.
+    default: true
+  unsent.read:
+    description: Allows reading unsent messages.
+    default: true
+  unsent.admin:
+    description: Admin access (clear messages, bypass filter).
+    default: op

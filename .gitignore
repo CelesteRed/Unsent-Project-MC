@@ -1,0 +1,23 @@
+# Maven
+target/
+*.class
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.eclipse
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Plugin data (generated at runtime)
+plugins/
+
+# Built jars (keep source, not compiled output)
+*.jar
+!libs/*.jar
