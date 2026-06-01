@@ -133,6 +133,108 @@ After building, the testing loop is:
 
 ---
 
+## Task 4 [Update 1.4.0] - AI moderation — ✅ DONE (shipped in v1.5.0)
+
+Create a moderation system built on top of the existing one that just catches bad words, and then this AI moderation will be used to catch any possible bypasses! I will be using OpenAI with a API key, so in the config mke a new input for the key and also ensure tht the prompt to give the agent returns back true or false on if the message is safe and not threatning or sexual in any way! this is a 13+ server!!!
+
+**Done:** `AiModerator` (OpenAI chat-completions, true/false safe-for-13+ prompt) runs async on top of
+`WordFilter`. Config under `ai-moderation` (`enabled`, `api-key`, `model`, `timeout-seconds`,
+`fail-closed`). See README → *AI moderation (optional)*.
+
+---
+
+## Task 5 [planned] — Real-username check, placement whitelist, polished chat, per-user moderation log
+
+Four related features. Each can reasonably ship as its own version (suggest one per version, 5A → 5D).
+**⚠️ Some of the requirements conflict or need a decision — see "Decisions to confirm" at the bottom
+before writing any code.**
+
+### 5A — Verify the recipient is a real Minecraft account (via an API)
+
+**Goal:** When a player runs `/unsent <name> <message>`, confirm `<name>` is an actual Minecraft
+username before creating the note; reject unknown names.
+
+**Why an API:** Bukkit's `getOfflinePlayer(name)` never confirms a *global* account — it returns an
+object regardless, and `hasPlayedBefore()` only knows about the local server. Existence has to be
+checked against Mojang (directly or via a wrapper).
+
+**Researched options to evaluate:**
+
+| Option | Endpoint | Notes |
+|---|---|---|
+| Mojang (official) | `GET api.mojang.com/users/profiles/minecraft/<name>` | 200 + `{id,name}` if real; 404/empty if not. No auth. Rate-limited (~hundreds / 10 min per IP). |
+| Mojang (services host) | `api.minecraftservices.com/minecraft/profile/lookup/name/<name>` | Same idea on the current service host. |
+| PlayerDB | `playerdb.co/api/player/minecraft/<name>` | Friendly JSON wrapper with a `success` flag; caches upstream. |
+| Ashcon | `api.ashcon.app/mojang/v2/user/<name>` | Wrapper; 404 when missing; also returns UUID/skin. |
+
+**Approach:**
+- Async HTTP — reuse the `AiModerator` pattern (`HttpClient` off-thread → hop back to main thread).
+- New `UsernameValidator` class; **cache** positive/negative results (TTL) to respect rate limits.
+- Cheap pre-check first with the existing `isValidName` regex (consider tightening to Mojang's
+  3–16 `[A-Za-z0-9_]`).
+- Config block, e.g. `username-validation`: `enabled`, `fail-closed` (reject vs allow on API error),
+  `cache-ttl`. Likely **off by default** so offline-mode / creative servers aren't broken.
+- Edge cases: offline-mode servers, name changes, API downtime, recipient who never joined here.
+
+### 5B — Restrict where maps can be placed (whitelist of blocks; no floor/ceiling)
+
+**Goal:** A new `whitelist.yml` in the plugin folder lists the block materials that ARE allowed to
+hold an unsent map. Placing a map into an item frame is only permitted when (a) the block the frame
+hangs on is whitelisted, **and** (b) the frame faces a wall — **floor/ceiling (UP/DOWN) frames are
+rejected**.
+
+**Approach:**
+- New `whitelist.yml` (a set of `Material` names) + loader (consider the same auto-update treatment
+  as `config.yml`/`ConfigUpdater`). Ship sensible defaults.
+- Intercept the map entering a frame in `ItemFrameListener.onFrameInteract` (the empty-frame +
+  placing-our-map branch that already exists):
+  - reject if `frame.getFacing()` is `UP`/`DOWN` (floor/ceiling),
+  - reject if the attached block (frame location relative to the opposite of its facing) isn't
+    whitelisted,
+  - on reject: cancel the interaction so the map stays in hand, and send a message.
+- Edge cases: maps placed before this existed, creative mode, possible `unsent.admin` bypass.
+
+**⚠️ Wording conflict:** the request says both "placed anywhere **but** blacklisted blocks" and a
+"whitelist … blocks that ARE allowed." Planned here as a **whitelist** (allow-list). Confirm whether
+you want allow-list only, allow-everywhere-except-a-blacklist, or both.
+
+### 5C — Polish chat output with MiniMessage
+
+**Goal:** Make command feedback look nicer — bold accents, colour, maybe a gradient prefix — using
+"mini text" (Adventure **MiniMessage**, which ships with Paper, no new dependency).
+
+**Approach:**
+- Add a small `Messages` helper with a shared `MiniMessage` instance and a prefix
+  (e.g. `<gradient:#ff8fb1:#b18cff><bold>Unsent</bold></gradient> ›`).
+- Refactor user-facing text in `UnsentCommand`, `ReadCommand`, `RecoverCommand`, and the new admin
+  command to MiniMessage. Keep it tasteful and readable.
+
+### 5D — Per-user moderation log + `/unsentadmin inspect <user>`
+
+**Goal:** Record each player's activity so an admin can review it. `/unsentadmin inspect <user>`
+shows that user's **sent** messages AND their **flagged** messages — ones blocked by the word filter
+or AI moderation that were never sent.
+
+**Approach:**
+- Log keyed by the **sender's** account (UUID + cached name), not the recipient.
+- New `UserLog` store (e.g. `users/<uuid>.yml`, or a single `user-log.yml`) with entries like
+  `{type: SENT|FLAGGED, recipient, message, reason, timestamp}`, where `reason` ∈ word-filter /
+  ai-moderation.
+- Hook points in `UnsentCommand`: on a successful send → log `SENT`; when the word filter or AI
+  blocks a message → log `FLAGGED` with the reason and the attempted text.
+- New `AdminCommand` for `/unsentadmin <subcommand>` (start with `inspect`), permission
+  `unsent.admin`; declare in `plugin.yml`. Resolve `<user>` → UUID (online player, the cache, or 5A).
+- Render with MiniMessage (ties into 5C). Consider paging when a user has many entries.
+
+### ⚠️ Decisions to confirm before implementing
+1. **5B:** whitelist (allow-list) vs blacklist vs both? *(planned: whitelist.)*
+2. **5A:** default on or off? reject-or-allow on API failure? tighten names to Mojang's 3–16 rule?
+   grandfather existing free-form names?
+3. **5D:** confirm `inspect <user>` means the *sender's* sent + flagged activity *(assumed yes)*.
+4. Ship order / versioning — suggest one feature per version (5A → 5D).
+
+---
+
 ## Quick reference — file map
 
 | File | Responsibility |

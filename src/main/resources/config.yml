@@ -1,7 +1,7 @@
 # UnsentPlugin Configuration
-
-# Config version — matches the plugin version this config shipped with.
-config-version: '1.1.0'
+#
+# New options are merged in automatically when you update the plugin — your existing
+# settings are kept. The version marker that controls this lives at the BOTTOM of the file.
 
 # Words blocked from appearing in messages (case-insensitive)
 blocked-words:
@@ -150,8 +150,43 @@ max-message-length: 80
 # Max messages stored per name
 max-messages-per-name: 100
 
+# Max messages (note-maps) a single player can make. Each /unsent creates one message and
+# one map, so this caps how many a person can author. Players with the unsent.unlimited
+# permission (OPs have it by default) can make as many as they want and ignore this limit.
+# Set to 0 (or below) to disable the limit for everyone.
+# (The old key name `max-maps-per-player` is still read as a fallback if present.)
+max-messages-per-player: 10
+
+# Cooldown (in seconds) a player must wait between making maps. Players with the
+# unsent.unlimited permission (OPs by default) are exempt. Set to 0 to disable.
+creation-cooldown-seconds: 30
+
+# ── AI moderation (OpenAI) ───────────────────────────────────────────────────
+# A second moderation layer on top of the blocked-words list above. Every message is
+# sent to OpenAI, which answers whether it is safe for a 13+ audience (no sexual or
+# threatening content) — this catches creative spellings and bypasses the word list misses.
+ai-moderation:
+  # Master switch. While false, only the blocked-words filter runs (no network calls).
+  enabled: false
+  # Your OpenAI API key — KEEP THIS SECRET. Required when enabled. Looks like "sk-...".
+  api-key: ""
+  # Which OpenAI model to use. gpt-4o-mini is cheap, fast, and accurate enough here.
+  model: "gpt-4o-mini"
+  # How long to wait (seconds) for OpenAI before giving up on a single message.
+  timeout-seconds: 8
+  # What to do when a check can't complete (bad key, network error, timeout):
+  #   true  = reject the message  (safer — recommended for a 13+ server)
+  #   false = let it through       (the word filter still applies)
+  fail-closed: true
+
 # Map appearance
 map:
   background-color: "WHITE"
   text-color: "BLACK"
   font-size: 10
+
+# ── Do not edit below ────────────────────────────────────────────────────────
+# Records the plugin version this config was generated for. On startup the plugin
+# compares it to the version it ships with and, if they differ, merges in any new
+# options (keeping your settings) and re-stamps this value. Leave it alone.
+config-version: '1.6.1'
