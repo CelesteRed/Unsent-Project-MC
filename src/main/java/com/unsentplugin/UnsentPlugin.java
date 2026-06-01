@@ -27,6 +27,8 @@ public class UnsentPlugin extends JavaPlugin {
         getCommand("unsentread").setExecutor(readCmd);
         getCommand("unsentread").setTabCompleter(readCmd);
 
+        getServer().getPluginManager().registerEvents(new ItemFrameListener(this), this);
+
         getLogger().info("UnsentPlugin enabled. Messages will be saved to " + dataFolder.getPath());
     }
 

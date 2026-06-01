@@ -1,5 +1,8 @@
 # UnsentPlugin Configuration
 
+# Config version — matches the plugin version this config shipped with.
+config-version: '1.1.0'
+
 # Words blocked from appearing in messages (case-insensitive)
 blocked-words:
   # Sexual violence

@@ -65,13 +65,16 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        boolean saved = plugin.getMessageStore().save(name, message);
+        // Stamp once so the stored value and the value rendered on the map match exactly.
+        long now = System.currentTimeMillis();
+
+        boolean saved = plugin.getMessageStore().save(name, message, now);
         if (!saved) {
             player.sendMessage(Component.text("There are already too many messages for that name.").color(NamedTextColor.YELLOW));
             return true;
         }
 
-        ItemStack map = MapFactory.createMap(player.getWorld(), name, message);
+        ItemStack map = MapFactory.createMap(plugin, player.getWorld(), name, message, now);
 
         if (player.getInventory().firstEmpty() == -1) {
             player.getWorld().dropItemNaturally(player.getLocation(), map);

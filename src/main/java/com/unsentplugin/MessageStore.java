@@ -4,7 +4,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,8 +18,12 @@ public class MessageStore {
         if (!messagesDir.exists()) messagesDir.mkdirs();
     }
 
-    /** Saves a new message for the given name. Returns false if the cap is reached. */
-    public boolean save(String name, String message) {
+    /**
+     * Saves a new message for the given name, stamped with the given epoch-millis timestamp.
+     * Returns false if the cap is reached. The caller passes the timestamp so the same value
+     * can be rendered onto the map and stored here.
+     */
+    public boolean save(String name, String message, long timestamp) {
         File file = fileFor(name);
         YamlConfiguration cfg = YamlConfiguration.loadConfiguration(file);
 
@@ -29,7 +32,7 @@ public class MessageStore {
         if (messages.size() >= cap) return false;
 
         // Store message with timestamp prefix separated by "|"
-        messages.add(Instant.now().toEpochMilli() + "|" + message);
+        messages.add(timestamp + "|" + message);
         cfg.set("messages", messages);
 
         try {

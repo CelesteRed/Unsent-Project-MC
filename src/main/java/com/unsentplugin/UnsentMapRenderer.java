@@ -7,6 +7,9 @@ import org.bukkit.map.MapView;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,13 +18,19 @@ public class UnsentMapRenderer extends MapRenderer {
     // The map canvas is always 128×128 pixels.
     private static final int MAP_SIZE = 128;
 
+    // Date stamp drawn on the map, e.g. 06/01/26.
+    private static final DateTimeFormatter DATE_FMT =
+            DateTimeFormatter.ofPattern("MM/dd/yy").withZone(ZoneId.systemDefault());
+
     private final String recipientName;
     private final String message;
+    private final long timestamp;
     private boolean rendered = false;
 
-    public UnsentMapRenderer(String recipientName, String message) {
+    public UnsentMapRenderer(String recipientName, String message, long timestamp) {
         this.recipientName = recipientName;
         this.message       = message;
+        this.timestamp     = timestamp;
     }
 
     @Override
@@ -67,7 +76,19 @@ public class UnsentMapRenderer extends MapRenderer {
         for (String line : lines) {
             g.drawString(line, 6, y);
             y += bodyFm.getHeight() + 1;
-            if (y > MAP_SIZE - 10) break;
+            // Stop early to leave room for the date footer at the bottom.
+            if (y > MAP_SIZE - 16) break;
+        }
+
+        // ── Date footer (mm/dd/yy) ─────────────────────────────────────────
+        if (timestamp > 0) {
+            Font dateFont = new Font("SansSerif", Font.PLAIN, 7);
+            g.setFont(dateFont);
+            g.setColor(new Color(150, 150, 150));
+            String date = DATE_FMT.format(Instant.ofEpochMilli(timestamp));
+            FontMetrics dateFm = g.getFontMetrics();
+            int dateX = MAP_SIZE - 6 - dateFm.stringWidth(date);
+            g.drawString(date, dateX, MAP_SIZE - 5);
         }
 
         g.dispose();

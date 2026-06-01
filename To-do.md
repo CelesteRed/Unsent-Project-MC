@@ -4,6 +4,10 @@ Tasks for future Claude agents working on this plugin. Read this whole file befo
 starting — the **Build environment** section has a gotcha that will waste your time
 if you miss it.
 
+> **Status (2026-06-01):** Tasks 1, 2, and 3 are all ✅ **DONE**. JDK 25 was found at
+> `C:\Users\celes\.jdks\openjdk-25.0.2` and the jar builds cleanly with it. `pom.xml` and
+> `README.md` were updated from "Java 21" to the real requirement (Java 25).
+
 ---
 
 ## ⚠️ Build environment (read first)

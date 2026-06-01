@@ -14,23 +14,23 @@ A Minecraft Paper plugin inspired by [The Unsent Project](https://unsentproject.
 ## Requirements
 
 - **Paper 26.1.2+**
-- **Java 21+**
+- **Java 25+** (Paper API 26.1.2 is compiled to Java 25 bytecode)
 
 ## Installation
 
-1. Drop `UnsentPlugin-1.0.0.jar` into your server's `plugins/` folder
+1. Drop `UnsentPlugin-1.1.0.jar` into your server's `plugins/` folder
 2. Restart the server
 3. Done — no configuration needed
 
 ## Building from Source
 
-Requires **JDK 21+** and **Maven 3.8+**.
+Requires **JDK 25+** and **Maven 3.8+**.
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/UnsentPlugin.git
 cd UnsentPlugin
 mvn package
-# Output jar: target/UnsentPlugin-1.0.0.jar
+# Output jar: target/UnsentPlugin-1.1.0.jar
 ```
 
 ## Configuration

@@ -6,14 +6,16 @@
 
     <groupId>com.unsentplugin</groupId>
     <artifactId>UnsentPlugin</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <name>UnsentPlugin</name>
     <description>Write anonymous unsent messages rendered as in-game maps.</description>
 
     <properties>
-        <java.version>21</java.version>
+        <!-- Paper API 26.1.2 ships Java 25 bytecode (class-file major version 69), so the
+             plugin must be compiled with JDK 25. Do not downgrade this to 21. -->
+        <java.version>25</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
