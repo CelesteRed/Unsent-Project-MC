@@ -22,6 +22,8 @@ public class UnsentPlugin extends JavaPlugin {
         File dataFolder = getDataFolder();
         if (!dataFolder.exists()) dataFolder.mkdirs();
 
+        MapFont.load(this); // load the note font (font.ttf / config / fallback)
+
         messageStore   = new MessageStore(this);
         wordFilter     = new WordFilter(this);
         mapStore       = new MapStore(this);
@@ -40,6 +42,7 @@ public class UnsentPlugin extends JavaPlugin {
         RecoverCommand recoverCmd = new RecoverCommand(this);
         AdminCommand   adminCmd   = new AdminCommand(this);
         ReloadCommand  reloadCmd  = new ReloadCommand(this);
+        VipCommand     vipCmd     = new VipCommand(this, unsentCmd);
 
         getCommand("unsent").setExecutor(unsentCmd);
         getCommand("unsent").setTabCompleter(unsentCmd);
@@ -50,10 +53,12 @@ public class UnsentPlugin extends JavaPlugin {
         getCommand("unsentadmin").setExecutor(adminCmd);
         getCommand("unsentadmin").setTabCompleter(adminCmd);
         getCommand("unsentreload").setExecutor(reloadCmd);
+        getCommand("unsentvip").setExecutor(vipCmd);
+        getCommand("unsentvip").setTabCompleter(vipCmd);
 
         getServer().getPluginManager().registerEvents(new ItemFrameListener(this), this);
-        getServer().getPluginManager().registerEvents(new ColorPromptListener(this, unsentCmd), this);
         getServer().getPluginManager().registerEvents(new NoteVoucherListener(this), this);
+        getServer().getPluginManager().registerEvents(new NoteItemListener(this), this);
 
         // Regenerate note credits and refresh each online player's voucher once a minute.
         getServer().getScheduler().runTaskTimer(this, () -> {

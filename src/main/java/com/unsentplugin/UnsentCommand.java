@@ -31,12 +31,6 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
     /** Epoch-millis of each player's last successful map creation, for the cooldown. */
     private final Map<UUID, Long> lastCreation = new ConcurrentHashMap<>();
 
-    /** Players who passed all checks and are being asked for a background colour (unsent.color). */
-    private final Map<UUID, PendingNote> pendingColors = new ConcurrentHashMap<>();
-
-    /** A note awaiting a background-colour choice. */
-    private record PendingNote(String name, String message) {}
-
     public UnsentCommand(UnsentPlugin plugin) {
         this.plugin = plugin;
     }
@@ -54,46 +48,51 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (pendingColors.containsKey(player.getUniqueId())) {
-            player.sendMessage(Component.text("Choose a colour for your previous note first (type a hex code, 'default', or 'cancel').").color(NamedTextColor.YELLOW));
-            return true;
-        }
-
         if (args.length < 2) {
             player.sendMessage(Component.text("Usage: /unsent <name> <message>").color(NamedTextColor.RED));
             return true;
         }
 
         String name = args[0];
+        String message = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+
+        // Default note: white background, font size from config.
+        int fontSize = plugin.getConfig().getInt("map.font-size", 8);
+        send(player, name, message, Color.WHITE, fontSize);
+        return true;
+    }
+
+    /**
+     * Full send pipeline — validates the name/message, enforces the volume/cooldown limits, runs
+     * remote moderation, then creates the note with the given background and font size. Shared by
+     * {@code /unsent} (white, config size) and {@link VipCommand} (custom colour + size).
+     */
+    public void send(Player player, String name, String message, Color background, int fontSize) {
         WordFilter filter = plugin.getWordFilter();
 
         if (!filter.isValidName(name)) {
             player.sendMessage(Component.text("That name isn't valid. Use letters, numbers, or underscores (max 16 chars).").color(NamedTextColor.RED));
-            return true;
+            return;
         }
-
         if (filter.isBlocked(name)) {
             player.sendMessage(Component.text("That name contains blocked content.").color(NamedTextColor.RED));
-            return true;
+            return;
         }
-
-        String message = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
 
         int maxLen = plugin.getConfig().getInt("max-message-length", 80);
         if (message.length() > maxLen) {
             player.sendMessage(Component.text("Your message is too long (max " + maxLen + " characters).").color(NamedTextColor.RED));
-            return true;
+            return;
         }
-
         if (filter.isBlocked(message)) {
             player.sendMessage(Component.text("Your message contains content that isn't allowed. Please keep it kind.").color(NamedTextColor.RED));
-            return true;
+            return;
         }
 
         // Notes must be unique — no duplicate of the same message to the same name.
         if (plugin.getMessageStore().isDuplicate(name, message)) {
             notifyDuplicate(player, name);
-            return true;
+            return;
         }
 
         // Volume control. unsent.unlimited (OPs by default) bypasses it. When note-credits is on it
@@ -106,43 +105,41 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
                     long ms = plugin.getPlayerStore().millisToNextCredit(player.getUniqueId());
                     player.sendMessage(Component.text("You're out of notes — the next one is ready in "
                             + formatDuration(ms) + ".").color(NamedTextColor.YELLOW));
-                    return true;
+                    return;
                 }
             } else {
-                // Read the new key, falling back to the old `max-maps-per-player` name, then default 10.
                 int messageLimit = plugin.getConfig().getInt("max-messages-per-player",
                         plugin.getConfig().getInt("max-maps-per-player", 10));
                 if (messageLimit > 0 && plugin.getPlayerStore().getMessageCount(player.getUniqueId()) >= messageLimit) {
                     player.sendMessage(Component.text("You've reached your limit of " + messageLimit + " messages.").color(NamedTextColor.YELLOW));
-                    return true;
+                    return;
                 }
             }
         }
 
-        // Rate limit: enforce a cooldown between creations (unlimited players are exempt).
+        // Rate limit: cooldown between creations (unlimited players are exempt).
         if (!unlimited) {
             int cooldownSeconds = plugin.getConfig().getInt("creation-cooldown-seconds", 30);
             if (cooldownSeconds > 0) {
                 long last = lastCreation.getOrDefault(player.getUniqueId(), 0L);
                 long remainingMs = cooldownSeconds * 1000L - (System.currentTimeMillis() - last);
                 if (remainingMs > 0) {
-                    long remainingSec = (remainingMs + 999) / 1000; // round up
-                    player.sendMessage(Component.text("Please wait " + remainingSec
-                            + "s before making another map.").color(NamedTextColor.YELLOW));
-                    return true;
+                    player.sendMessage(Component.text("Please wait " + formatDuration(remainingMs)
+                            + " before making another map.").color(NamedTextColor.YELLOW));
+                    return;
                 }
             }
         }
 
-        // Remote checks — real-username validation and AI moderation — are blocking HTTP calls, so
-        // run them off the main thread in sequence, then finish back on the main thread.
+        // Remote checks (username validation + AI moderation) are blocking HTTP, so run them off the
+        // main thread, then finish back on it.
         UsernameValidator validator = plugin.getUsernameValidator();
         AiModerator ai = plugin.getAiModerator();
         if (validator.isEnabled() || ai.isEnabled()) {
             UUID uuid = player.getUniqueId();
             if (!pendingChecks.add(uuid)) {
                 player.sendMessage(Component.text("Hold on — your last message is still being checked.").color(NamedTextColor.YELLOW));
-                return true;
+                return;
             }
             player.sendMessage(Component.text("Checking your message…").color(NamedTextColor.GRAY));
 
@@ -154,16 +151,14 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
                     if (rejection != null) {
                         player.sendMessage(Component.text(rejection).color(NamedTextColor.RED));
                     } else {
-                        finishUnsent(player, name, message);
+                        createNote(player, name, message, background, fontSize);
                     }
                 });
             });
-            return true;
+            return;
         }
 
-        // No remote checks enabled — commit immediately.
-        finishUnsent(player, name, message);
-        return true;
+        createNote(player, name, message, background, fontSize);
     }
 
     /**
@@ -192,81 +187,9 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
         return null;
     }
 
-    /**
-     * Checks passed. Players with {@code unsent.color} are asked for a background colour first;
-     * everyone else gets a white note immediately.
-     */
-    private void finishUnsent(Player player, String name, String message) {
-        if (player.hasPermission("unsent.color")) {
-            startColorPrompt(player, name, message);
-        } else {
-            createNote(player, name, message, Color.WHITE);
-        }
-    }
-
-    /** Stores a pending note and asks the player to type a background colour in chat. */
-    private void startColorPrompt(Player player, String name, String message) {
-        UUID uuid = player.getUniqueId();
-        pendingColors.put(uuid, new PendingNote(name, message));
-
-        player.sendMessage(Component.text("Color: ").color(NamedTextColor.GRAY)
-                .append(Component.text("White").color(NamedTextColor.WHITE))
-                .append(Component.text(" [default]").color(NamedTextColor.DARK_GRAY)));
-        player.sendMessage(Component.text("Type a hex code (e.g. #FFAA00) for the background, "
-                + "or 'default' to keep white. 'cancel' to abort.").color(NamedTextColor.GRAY));
-
-        // Expire after 60s — fall back to a white note so a passed message isn't lost.
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            PendingNote stale = pendingColors.remove(uuid);
-            if (stale != null && player.isOnline()) {
-                player.sendMessage(Component.text("No colour chosen — using white.").color(NamedTextColor.GRAY));
-                createNote(player, stale.name(), stale.message(), Color.WHITE);
-            }
-        }, 20L * 60);
-    }
-
-    /** True if the player is mid-prompt for a background colour. Called by {@link ColorPromptListener}. */
-    public boolean hasPendingColor(UUID uuid) {
-        return pendingColors.containsKey(uuid);
-    }
-
-    /** Handles a player's typed colour input (run on the main thread by {@link ColorPromptListener}). */
-    public void submitColor(Player player, String input) {
-        PendingNote pending = pendingColors.get(player.getUniqueId());
-        if (pending == null) return; // expired or already handled
-
-        String text = input.trim();
-        if (text.equalsIgnoreCase("cancel")) {
-            pendingColors.remove(player.getUniqueId());
-            player.sendMessage(Component.text("Cancelled — note discarded.").color(NamedTextColor.YELLOW));
-            return;
-        }
-
-        Color color = parseColor(text);
-        if (color == null) {
-            player.sendMessage(Component.text("That isn't a valid hex colour. Try #RRGGBB, 'default', or 'cancel'.").color(NamedTextColor.RED));
-            return; // keep the prompt open for another try
-        }
-
-        pendingColors.remove(player.getUniqueId());
-        createNote(player, pending.name(), pending.message(), color);
-    }
-
-    /** Parses "#RRGGBB"/"RRGGBB", or "default"/"white"/empty → white. Returns null if invalid. */
-    private Color parseColor(String input) {
-        if (input.isEmpty() || input.equalsIgnoreCase("default") || input.equalsIgnoreCase("white")) {
-            return Color.WHITE;
-        }
-        String hex = input.startsWith("#") ? input.substring(1) : input;
-        if (hex.matches("[0-9A-Fa-f]{6}")) {
-            return new Color(Integer.parseInt(hex, 16));
-        }
-        return null;
-    }
-
-    /** Saves the message, builds the map with the chosen background, gives it, and counts it. */
-    private void createNote(Player player, String name, String message, Color background) {
-        // Re-check uniqueness here too — this is the authoritative point, after any prompt/async gap.
+    /** Saves the message, builds the map with the given background/font size, gives it, and accounts for it. */
+    private void createNote(Player player, String name, String message, Color background, int fontSize) {
+        // Re-check uniqueness here too — this is the authoritative point, after any async gap.
         if (plugin.getMessageStore().isDuplicate(name, message)) {
             notifyDuplicate(player, name);
             return;
@@ -281,7 +204,7 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        ItemStack map = MapFactory.createMap(plugin, player.getWorld(), name, message, now, background);
+        ItemStack map = MapFactory.createMap(plugin, player.getWorld(), name, message, now, background, fontSize);
 
         if (player.getInventory().firstEmpty() == -1) {
             player.getWorld().dropItemNaturally(player.getLocation(), map);
@@ -320,17 +243,20 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    /** Clears any pending colour prompt for a player (called when they quit). */
-    public void clearPendingColor(UUID uuid) {
-        pendingColors.remove(uuid);
-    }
-
-    /** Formats a millisecond duration as "Xm Ys" (or "Ys" under a minute). */
+    /** Formats a duration as days/hours/minutes/seconds, e.g. "6d 23h 59m 12s" or "45s". */
     private static String formatDuration(long ms) {
         long totalSeconds = (ms + 999) / 1000;
-        long minutes = totalSeconds / 60;
+        long days    = totalSeconds / 86_400;
+        long hours   = (totalSeconds % 86_400) / 3_600;
+        long minutes = (totalSeconds % 3_600) / 60;
         long seconds = totalSeconds % 60;
-        return minutes > 0 ? minutes + "m " + seconds + "s" : seconds + "s";
+
+        StringBuilder sb = new StringBuilder();
+        if (days > 0)                            sb.append(days).append("d ");
+        if (days > 0 || hours > 0)               sb.append(hours).append("h ");
+        if (days > 0 || hours > 0 || minutes > 0) sb.append(minutes).append("m ");
+        sb.append(seconds).append("s");
+        return sb.toString();
     }
 
     private void notifyDuplicate(Player player, String name) {
@@ -339,24 +265,27 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" — make it unique!").color(NamedTextColor.YELLOW)));
     }
 
+    /** Recipient-name suggestions (online + previously-joined players, plus names with messages). */
+    static List<String> suggestNames(UnsentPlugin plugin, String typed) {
+        String lower = typed.toLowerCase();
+        TreeSet<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (OfflinePlayer offline : Bukkit.getOfflinePlayers()) {
+            String playerName = offline.getName();
+            if (playerName != null && playerName.toLowerCase().startsWith(lower)) {
+                names.add(playerName);
+            }
+        }
+        for (String storedName : plugin.getMessageStore().allNames()) {
+            if (storedName.toLowerCase().startsWith(lower)) names.add(storedName);
+        }
+        return names.stream().limit(100).toList();
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
         if (label.contains(":")) return Collections.emptyList();
         if (args.length == 1) {
-            String typed = args[0].toLowerCase();
-            // Suggest online + previously-joined players (like /tp, but offline players too),
-            // plus any names that already have messages. Case-insensitive, de-duplicated.
-            TreeSet<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            for (OfflinePlayer offline : Bukkit.getOfflinePlayers()) {
-                String playerName = offline.getName();
-                if (playerName != null && playerName.toLowerCase().startsWith(typed)) {
-                    names.add(playerName);
-                }
-            }
-            for (String storedName : plugin.getMessageStore().allNames()) {
-                if (storedName.toLowerCase().startsWith(typed)) names.add(storedName);
-            }
-            return names.stream().limit(100).toList();
+            return suggestNames(plugin, args[0]);
         }
         return Collections.emptyList();
     }

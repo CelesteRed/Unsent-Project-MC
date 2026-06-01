@@ -29,13 +29,15 @@ public class UnsentMapRenderer extends MapRenderer {
     private final String message;
     private final long timestamp;
     private final Color background;
+    private final int bodyFontSize;
     private boolean rendered = false;
 
-    public UnsentMapRenderer(String recipientName, String message, long timestamp, Color background) {
+    public UnsentMapRenderer(String recipientName, String message, long timestamp, Color background, int bodyFontSize) {
         this.recipientName = recipientName;
         this.message       = message;
         this.timestamp     = timestamp;
         this.background     = background != null ? background : Color.WHITE;
+        this.bodyFontSize  = bodyFontSize;
     }
 
     /** True if the colour is dark enough that text on it should be light. */
@@ -68,8 +70,8 @@ public class UnsentMapRenderer extends MapRenderer {
         // Enable antialiasing for nicer text
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        // ── "to [Name]" header ────────────────────────────────────────────
-        Font headerFont = new Font("SansSerif", Font.ITALIC, 9);
+        // ── "to [Name]" header (always size 10; only the body scales) ──────
+        Font headerFont = MapFont.derive(Font.ITALIC, 10f);
         g.setFont(headerFont);
         g.setColor(fg);
         String header = "to " + recipientName + ",";
@@ -79,24 +81,31 @@ public class UnsentMapRenderer extends MapRenderer {
         g.setColor(faint);
         g.drawLine(6, 17, MAP_SIZE - 6, 17);
 
-        // ── Message body ──────────────────────────────────────────────────
-        Font bodyFont = new Font("SansSerif", Font.PLAIN, 8);
+        // ── Message body (centred, kept below the header) ──────────────────
+        Font bodyFont = MapFont.derive(Font.PLAIN, bodyFontSize);
         g.setFont(bodyFont);
         g.setColor(fg);
         FontMetrics bodyFm = g.getFontMetrics();
 
         List<String> lines = wrapText(message, bodyFm, MAP_SIZE - 12);
-        int y = 28;
+
+        int lineHeight = bodyFm.getHeight();
+        int areaBottom = MAP_SIZE - 18;   // leave room for the date/watermark footer
+        // Start the first line just below the separator. Because the baseline is measured from the
+        // font's ascent, the TOP of the text is always at areaTop (21) no matter how big the font
+        // is — so the body can never reach the header. Left-aligned, flowing top-down.
+        int areaTop = 21;
+        int baseline = areaTop + bodyFm.getAscent();
+
         for (String line : lines) {
-            g.drawString(line, 6, y);
-            y += bodyFm.getHeight() + 1;
-            // Stop early to leave room for the date footer at the bottom.
-            if (y > MAP_SIZE - 16) break;
+            if (baseline > areaBottom) break; // don't overrun the footer
+            g.drawString(line, 6, baseline);
+            baseline += lineHeight;
         }
 
         // ── Date footer (mm/dd/yy) ─────────────────────────────────────────
         if (timestamp > 0) {
-            g.setFont(new Font("SansSerif", Font.PLAIN, 7));
+            g.setFont(MapFont.derive(Font.PLAIN, 7f));
             g.setColor(faint);
             String date = DATE_FMT.format(Instant.ofEpochMilli(timestamp));
             FontMetrics dateFm = g.getFontMetrics();
@@ -105,7 +114,7 @@ public class UnsentMapRenderer extends MapRenderer {
         }
 
         // ── Watermark (bottom-left) ────────────────────────────────────────
-        g.setFont(new Font("SansSerif", Font.PLAIN, 6));
+        g.setFont(MapFont.derive(Font.PLAIN, 6f));
         g.setColor(faint);
         g.drawString(WATERMARK, 4, MAP_SIZE - 4);
 

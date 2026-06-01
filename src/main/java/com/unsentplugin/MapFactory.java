@@ -27,13 +27,19 @@ public class MapFactory {
         return new NamespacedKey(plugin, "unsent_map");
     }
 
+    /** True if the item carries our unsent-map marker in its PersistentDataContainer. */
+    public static boolean isUnsentMap(Plugin plugin, ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        return item.getItemMeta().getPersistentDataContainer().has(unsentMapKey(plugin), PersistentDataType.BYTE);
+    }
+
     /**
      * Configures a MapView to display an unsent note: disables position tracking, strips the
      * default (terrain) renderers, and attaches a fresh {@link UnsentMapRenderer}. Used both when
      * a map is first created and when restoring renderers on startup (see {@link MapStore}).
      */
-    public static void applyUnsentRenderer(MapView mapView, String recipientName,
-                                           String message, long timestamp, Color background) {
+    public static void applyUnsentRenderer(MapView mapView, String recipientName, String message,
+                                           long timestamp, Color background, int fontSize) {
         mapView.setScale(MapView.Scale.NORMAL);
         mapView.setTrackingPosition(false);
         mapView.setUnlimitedTracking(false);
@@ -43,18 +49,21 @@ public class MapFactory {
             mapView.removeRenderer(r);
         }
 
-        mapView.addRenderer(new UnsentMapRenderer(recipientName, message, timestamp, background));
+        // Clamp the font size so a wild value can't break the 128px layout.
+        int clamped = Math.max(5, Math.min(24, fontSize));
+        mapView.addRenderer(new UnsentMapRenderer(recipientName, message, timestamp, background, clamped));
     }
 
     public static ItemStack createMap(UnsentPlugin plugin, World world, String recipientName,
-                                      String message, long timestamp, Color background) {
+                                      String message, long timestamp, Color background, int fontSize) {
         // Create a new MapView and attach our custom renderer
         MapView mapView = Bukkit.createMap(world);
-        applyUnsentRenderer(mapView, recipientName, message, timestamp, background);
+        applyUnsentRenderer(mapView, recipientName, message, timestamp, background, fontSize);
 
         // Remember this map so its renderer can be restored after a server restart
         // (runtime renderers are not persisted with the world — see MapStore).
-        plugin.getMapStore().record(mapView.getId(), recipientName, message, timestamp, background.getRGB() & 0xFFFFFF);
+        plugin.getMapStore().record(mapView.getId(), recipientName, message, timestamp,
+                background.getRGB() & 0xFFFFFF, fontSize);
 
         // Build the item
         ItemStack item = new ItemStack(Material.FILLED_MAP);
@@ -73,10 +82,11 @@ public class MapFactory {
      * a fresh renderer to the item's MapView, registers it for future restarts, and re-applies the
      * tag/name/lore — so even maps created before the registry existed can be brought back.
      */
-    public static void restoreMap(UnsentPlugin plugin, ItemStack item, MapView mapView,
-                                  String recipientName, String message, long timestamp, Color background) {
-        applyUnsentRenderer(mapView, recipientName, message, timestamp, background);
-        plugin.getMapStore().record(mapView.getId(), recipientName, message, timestamp, background.getRGB() & 0xFFFFFF);
+    public static void restoreMap(UnsentPlugin plugin, ItemStack item, MapView mapView, String recipientName,
+                                  String message, long timestamp, Color background, int fontSize) {
+        applyUnsentRenderer(mapView, recipientName, message, timestamp, background, fontSize);
+        plugin.getMapStore().record(mapView.getId(), recipientName, message, timestamp,
+                background.getRGB() & 0xFFFFFF, fontSize);
 
         item.editMeta(MapMeta.class, meta -> {
             meta.setMapView(mapView);

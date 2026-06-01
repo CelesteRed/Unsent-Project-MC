@@ -211,12 +211,31 @@ username-validation:
 
 # Map appearance
 map:
-  background-color: "WHITE"
-  text-color: "BLACK"
+  # Default body text size for /unsent notes (clamped 5–24). The "to <name>" header is always 10.
+  # Players with unsent.color use /unsentvip to pick a size (10–24) and hex background per note.
   font-size: 10
+  # Font used to draw the note. To use a custom (e.g. Minecraft) font, drop a TrueType file at
+  # plugins/UnsentPlugin/font.ttf — it takes priority. Otherwise this names a system font family;
+  # if that isn't installed it falls back to SansSerif.
+  font: "Minecraft"
+
+# Named background colours usable in /unsentvip — e.g. "/unsentvip Steve 16 red hi there".
+# Reassign the hex codes to taste (keep the quotes). Players can still pass a raw #RRGGBB hex.
+colors:
+  red: "#FF5555"
+  orange: "#FFA500"
+  yellow: "#FFFF55"
+  green: "#55FF55"
+  blue: "#5555FF"
+  purple: "#AA00FF"
+  pink: "#FF69B4"
+  brown: "#8B5A2B"
+  cyan: "#55FFFF"
+  black: "#000000"
+  gray: "#AAAAAA"
 
 # ── Do not edit below ────────────────────────────────────────────────────────
 # Records the plugin version this config was generated for. On startup the plugin
 # compares it to the version it ships with and, if they differ, merges in any new
 # options (keeping your settings) and re-stamps this value. Leave it alone.
-config-version: '1.13.1'
+config-version: '1.15.0'

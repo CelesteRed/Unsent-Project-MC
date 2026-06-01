@@ -104,8 +104,9 @@ public class RecoverCommand implements CommandExecutor, TabCompleter {
         }
 
         MessageStore.UnsentMessage msg = messages.get(index - 1);
-        // Recovery doesn't know the original background, so default to white.
-        MapFactory.restoreMap(plugin, held, view, name, msg.text, msg.timestamp, java.awt.Color.WHITE);
+        // Recovery doesn't know the original background/size, so default to white + config size.
+        int fontSize = plugin.getConfig().getInt("map.font-size", 8);
+        MapFactory.restoreMap(plugin, held, view, name, msg.text, msg.timestamp, java.awt.Color.WHITE, fontSize);
 
         String date = msg.timestamp > 0 ? DATE_FMT.format(Instant.ofEpochMilli(msg.timestamp)) : "unknown date";
         player.sendMessage(

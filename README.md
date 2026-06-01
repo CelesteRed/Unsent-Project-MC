@@ -4,7 +4,8 @@ A Minecraft Paper plugin inspired by [The Unsent Project](https://unsentproject.
 
 ## Features
 
-- `/unsent <name> <message>` — writes your message and gives you a map item
+- `/unsent <name> <message>` — writes your message and gives you a map item (white, default text size)
+- `/unsentvip <name> <size> <color> <message>` — (perm `unsent.color`) custom body text size (10–24) + background (hex or a name like `red`)
 - `/unsentread <name>` — reads all saved messages for a name in chat
 - `/unsentrecover <name> [number]` — (admin) rebuilds the note on a held map from stored messages
 - `/unsentadmin whitelist <add|remove|list|reload> [block|hand]` — (admin) manage the placement whitelist; `hand` uses the held block
@@ -14,7 +15,7 @@ A Minecraft Paper plugin inspired by [The Unsent Project](https://unsentproject.
 - Optional **AI moderation** (OpenAI) as a second layer to catch filter bypasses — tuned for 13+
 - Optional **real-username validation** — only accept recipients that are real Minecraft accounts (multi-API failover)
 - Tab-complete recipient names from online **and** previously-joined players
-- `unsent.color` lets players pick a custom **background colour** (hex) for their note, with adaptive text contrast
+- `unsent.color` unlocks `/unsentvip` — a custom **body text size (10–24)** and **hex background**, with adaptive text contrast
 - Duplicate notes are rejected — the same message can't be sent to the same name twice (anti-flood)
 - **Note credits**: start with 1, earn one every week (configurable duration), shown as an "Unsent Note" paper item in your inventory
 - Per-player message limit (`max-messages-per-player`) and creation cooldown (`creation-cooldown-seconds`), both bypassed by `unsent.unlimited`
@@ -31,7 +32,7 @@ A Minecraft Paper plugin inspired by [The Unsent Project](https://unsentproject.
 
 ## Installation
 
-1. Drop `UnsentPlugin-1.13.1.jar` into your server's `plugins/` folder
+1. Drop `UnsentPlugin-1.15.4.jar` into your server's `plugins/` folder
 2. Restart the server
 3. Done — no configuration needed
 
@@ -43,7 +44,7 @@ Requires **JDK 25+** and **Maven 3.8+**.
 git clone https://github.com/YOUR_USERNAME/UnsentPlugin.git
 cd UnsentPlugin
 mvn package
-# Output jar: target/UnsentPlugin-1.13.1.jar
+# Output jar: target/UnsentPlugin-1.15.4.jar
 ```
 
 ## Configuration
@@ -144,15 +145,29 @@ Manage the list in-game with `/unsentadmin whitelist`:
 
 You can also edit `whitelist.yml` directly (it's never auto-merged, so removed blocks stay removed).
 
+### Note appearance (font & colours)
+
+- **Font:** put a font file named **exactly `font.ttf`** (or `font.otf`) inside the plugin's own
+  folder — `plugins/UnsentPlugin/font.ttf`, **not** `plugins/` — to render notes in a custom (e.g.
+  Minecraft) font. It takes priority; otherwise `map.font` names a system font family, falling back
+  to SansSerif. On startup the console logs whether it loaded (and the exact path if not). Run
+  `/unsentreload` or restart after adding it. (The plugin can't ship Minecraft's own font.)
+- **Named colours:** `/unsentvip` accepts a hex (`#FF5555`) **or** a name (`red`, `blue`, …). The
+  names and their hex live in the `colors:` section of `config.yml` — reassign them however you like.
+- `/unsentreload` re-reads the config, the whitelist, **and** the font.
+
 ## Permissions
 
 | Permission | Default | Description |
 |---|---|---|
-| `unsent.use` | everyone | Use `/unsent` |
+| `unsent.use` | **op** | Send notes (`/unsent`). No longer everyone — grant to a VIP rank (or via `unsent.color`) |
 | `unsent.read` | everyone | Use `/unsentread` |
 | `unsent.unlimited` | op | Bypass the `max-messages-per-player` limit |
-| `unsent.color` | op | Choose a custom background colour for your notes |
+| `unsent.color` | op | `/unsentvip` custom size + colour; **implies `unsent.use`** (so VIPs can send) |
 | `unsent.admin` | op | Admin access — bypass frame protection, `/unsentrecover`, `/unsentadmin` |
+
+> **Sending is now VIP/OP-only.** `unsent.use` defaults to `op`; grant it to your VIP rank (or give
+> that rank `unsent.color`, which includes it). Normal players can still *read* notes.
 
 ## License
 

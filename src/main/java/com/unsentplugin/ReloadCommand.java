@@ -28,6 +28,7 @@ public class ReloadCommand implements CommandExecutor {
 
         plugin.reloadConfig();
         plugin.getBlockWhitelist().reload();
+        MapFont.load(plugin); // pick up a swapped font.ttf / changed map.font
         int blocks = plugin.getBlockWhitelist().getAllowed().size();
 
         sender.sendMessage(
