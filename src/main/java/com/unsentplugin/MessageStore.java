@@ -43,6 +43,22 @@ public class MessageStore {
         return true;
     }
 
+    /**
+     * True if a note with this message already exists for the name. Comparison is normalized
+     * (trimmed, lower-cased, whitespace collapsed) so trivial variations still count as duplicates.
+     */
+    public boolean isDuplicate(String name, String message) {
+        String target = normalize(message);
+        for (UnsentMessage existing : load(name)) {
+            if (normalize(existing.text).equals(target)) return true;
+        }
+        return false;
+    }
+
+    private static String normalize(String s) {
+        return s.trim().toLowerCase().replaceAll("\\s+", " ");
+    }
+
     /** Returns all stored UnsentMessage objects for a name (oldest first). */
     public List<UnsentMessage> load(String name) {
         File file = fileFor(name);

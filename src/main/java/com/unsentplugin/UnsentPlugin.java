@@ -12,6 +12,7 @@ public class UnsentPlugin extends JavaPlugin {
     private PlayerStore playerStore;
     private AiModerator aiModerator;
     private BlockWhitelist blockWhitelist;
+    private UsernameValidator usernameValidator;
 
     @Override
     public void onEnable() {
@@ -27,6 +28,7 @@ public class UnsentPlugin extends JavaPlugin {
         playerStore    = new PlayerStore(this);
         aiModerator    = new AiModerator(this);
         blockWhitelist = new BlockWhitelist(this);
+        usernameValidator = new UsernameValidator(this);
 
         if (getConfig().getBoolean("ai-moderation.enabled", false) && !aiModerator.isEnabled()) {
             getLogger().warning("ai-moderation is enabled but no api-key is set — AI checks are inactive "
@@ -37,6 +39,7 @@ public class UnsentPlugin extends JavaPlugin {
         ReadCommand    readCmd    = new ReadCommand(this);
         RecoverCommand recoverCmd = new RecoverCommand(this);
         AdminCommand   adminCmd   = new AdminCommand(this);
+        ReloadCommand  reloadCmd  = new ReloadCommand(this);
 
         getCommand("unsent").setExecutor(unsentCmd);
         getCommand("unsent").setTabCompleter(unsentCmd);
@@ -46,8 +49,19 @@ public class UnsentPlugin extends JavaPlugin {
         getCommand("unsentrecover").setTabCompleter(recoverCmd);
         getCommand("unsentadmin").setExecutor(adminCmd);
         getCommand("unsentadmin").setTabCompleter(adminCmd);
+        getCommand("unsentreload").setExecutor(reloadCmd);
 
         getServer().getPluginManager().registerEvents(new ItemFrameListener(this), this);
+        getServer().getPluginManager().registerEvents(new ColorPromptListener(this, unsentCmd), this);
+        getServer().getPluginManager().registerEvents(new NoteVoucherListener(this), this);
+
+        // Regenerate note credits and refresh each online player's voucher once a minute.
+        getServer().getScheduler().runTaskTimer(this, () -> {
+            if (!getConfig().getBoolean("note-credits.enabled", true)) return;
+            for (org.bukkit.entity.Player online : getServer().getOnlinePlayers()) {
+                NoteVoucher.sync(this, online);
+            }
+        }, 20L * 60, 20L * 60);
 
         // Runtime map renderers aren't saved with the world, so existing unsent maps would render
         // blank after a restart. Re-attach them once the server is fully up (next tick).
@@ -70,4 +84,5 @@ public class UnsentPlugin extends JavaPlugin {
     public PlayerStore   getPlayerStore()   { return playerStore;   }
     public AiModerator   getAiModerator()   { return aiModerator;   }
     public BlockWhitelist getBlockWhitelist() { return blockWhitelist; }
+    public UsernameValidator getUsernameValidator() { return usernameValidator; }
 }

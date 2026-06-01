@@ -2,18 +2,23 @@ package com.unsentplugin;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Rotation;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -91,13 +96,105 @@ public class ItemFrameListener implements Listener {
                     return;
                 }
             }
-            // Allowed → reset rotation to upright once the map lands in the frame.
+            // Allowed → reset rotation to upright and hide the frame once the map lands in it.
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 if (frame.isValid() && isUnsentMap(frame.getItem())) {
                     frame.setRotation(Rotation.NONE);
+                    frame.setVisible(false);
                 }
             });
         }
+    }
+
+    /**
+     * Lets a player hang an unsent note by right-clicking a wall block with the map — the plugin
+     * spawns the item frame, drops the map into it, and takes one from the player. Placement is
+     * only allowed on a whitelisted block and never on floors/ceilings (admins bypass both). Once
+     * placed, the other handlers above keep it sealed for non-admins.
+     */
+    @SuppressWarnings("deprecation") // Material.isInteractable() is the available heuristic for "this block does something on right-click"
+    @EventHandler
+    public void onMapPlace(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getHand() == null) return;
+
+        Player player = event.getPlayer();
+        ItemStack item = itemInHand(player, event.getHand());
+        if (!isUnsentMap(item)) return;
+
+        Block clicked = event.getClickedBlock();
+        if (clicked == null) return;
+
+        // Don't hijack interactions with functional blocks (chests, doors, …) unless sneaking.
+        if (clicked.getType().isInteractable() && !player.isSneaking()) return;
+
+        event.setCancelled(true); // we handle this interaction ourselves
+
+        BlockFace face = event.getBlockFace();
+        boolean admin = player.hasPermission("unsent.admin");
+        if (!admin) {
+            if (face == BlockFace.UP || face == BlockFace.DOWN) {
+                player.sendMessage(Component.text("This note can't be placed here — hang it on a wall.").color(NamedTextColor.RED));
+                return;
+            }
+            if (!plugin.getBlockWhitelist().isAllowed(clicked.getType())) {
+                player.sendMessage(Component.text("This note can't be placed here.").color(NamedTextColor.RED));
+                return;
+            }
+        }
+
+        Block target = clicked.getRelative(face);
+        if (!target.isEmpty() && !target.isPassable()) {
+            player.sendMessage(Component.text("There's no room to hang the note there.").color(NamedTextColor.RED));
+            return;
+        }
+        if (frameAlreadyAt(target)) {
+            player.sendMessage(Component.text("There's already an item frame there.").color(NamedTextColor.RED));
+            return;
+        }
+
+        ItemStack single = item.clone();
+        single.setAmount(1);
+
+        ItemFrame frame;
+        try {
+            frame = target.getWorld().spawn(target.getLocation(), ItemFrame.class, f -> {
+                f.setFacingDirection(face, true);
+                f.setItem(single, false);
+                f.setRotation(Rotation.NONE);
+                f.setVisible(false); // hide the frame border so the note appears to float
+            });
+        } catch (IllegalArgumentException ex) {
+            player.sendMessage(Component.text("This note can't be placed here.").color(NamedTextColor.RED));
+            return;
+        }
+        if (!frame.isValid()) {
+            player.sendMessage(Component.text("This note can't be placed here.").color(NamedTextColor.RED));
+            return;
+        }
+
+        // Take one map from the player (survival only).
+        if (player.getGameMode() != GameMode.CREATIVE) {
+            int remaining = item.getAmount() - 1;
+            ItemStack leftover = null;
+            if (remaining > 0) {
+                leftover = item.clone();
+                leftover.setAmount(remaining);
+            }
+            if (event.getHand() == EquipmentSlot.OFF_HAND) {
+                player.getInventory().setItemInOffHand(leftover);
+            } else {
+                player.getInventory().setItemInMainHand(leftover);
+            }
+        }
+    }
+
+    /** True if an item frame already occupies the given block space. */
+    private boolean frameAlreadyAt(Block block) {
+        Location center = block.getLocation().add(0.5, 0.5, 0.5);
+        for (Entity entity : block.getWorld().getNearbyEntities(center, 0.5, 0.5, 0.5)) {
+            if (entity instanceof ItemFrame) return true;
+        }
+        return false;
     }
 
     /**

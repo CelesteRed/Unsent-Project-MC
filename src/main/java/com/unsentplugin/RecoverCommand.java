@@ -104,7 +104,8 @@ public class RecoverCommand implements CommandExecutor, TabCompleter {
         }
 
         MessageStore.UnsentMessage msg = messages.get(index - 1);
-        MapFactory.restoreMap(plugin, held, view, name, msg.text, msg.timestamp);
+        // Recovery doesn't know the original background, so default to white.
+        MapFactory.restoreMap(plugin, held, view, name, msg.text, msg.timestamp, java.awt.Color.WHITE);
 
         String date = msg.timestamp > 0 ? DATE_FMT.format(Instant.ofEpochMilli(msg.timestamp)) : "unknown date";
         player.sendMessage(

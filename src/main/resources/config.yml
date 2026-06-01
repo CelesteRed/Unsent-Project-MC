@@ -161,6 +161,18 @@ max-messages-per-player: 10
 # unsent.unlimited permission (OPs by default) are exempt. Set to 0 to disable.
 creation-cooldown-seconds: 30
 
+# ── Note credits (earn-over-time posting) ────────────────────────────────────
+# Players post notes using credits: they start with `start` and earn one more every
+# `regen-period`, up to `max`. Each /unsent spends one; an "Unsent Note" paper item in
+# the inventory shows the balance. Players with unsent.unlimited are exempt. While this
+# is enabled it REPLACES the flat max-messages-per-player limit above.
+# regen-period accepts a duration: e.g. 30m, 6h, 1d, 7d, 1w (m=minutes, h=hours, d=days, w=weeks).
+note-credits:
+  enabled: true
+  start: 1
+  max: 5
+  regen-period: 1w
+
 # ── AI moderation (OpenAI) ───────────────────────────────────────────────────
 # A second moderation layer on top of the blocked-words list above. Every message is
 # sent to OpenAI, which answers whether it is safe for a 13+ audience (no sexual or
@@ -179,6 +191,24 @@ ai-moderation:
   #   false = let it through       (the word filter still applies)
   fail-closed: true
 
+# ── Username validation (real Minecraft accounts) ────────────────────────────
+# When enabled, /unsent only accepts a recipient that is a real Minecraft account, checked
+# against the APIs below in order — the first that answers decides, and if one is down the
+# next is tried. Off by default so offline-mode / creative servers aren't affected.
+username-validation:
+  enabled: false
+  # After ALL providers fail to answer: reject the message (true) or allow it (false).
+  fail-closed: true
+  # How long (minutes) to remember a name's result before checking it again.
+  cache-ttl-minutes: 1440
+  # Seconds to wait for each provider before moving on to the next.
+  timeout-seconds: 6
+  # Providers tried in order. Built-ins: mojang, mojang-services, playerdb, ashcon.
+  providers:
+    - mojang
+    - playerdb
+    - ashcon
+
 # Map appearance
 map:
   background-color: "WHITE"
@@ -189,4 +219,4 @@ map:
 # Records the plugin version this config was generated for. On startup the plugin
 # compares it to the version it ships with and, if they differ, merges in any new
 # options (keeping your settings) and re-stamps this value. Leave it alone.
-config-version: '1.6.1'
+config-version: '1.13.1'

@@ -1,5 +1,5 @@
 name: UnsentPlugin
-version: '1.8.0'
+version: '1.13.1'
 main: com.unsentplugin.UnsentPlugin
 api-version: '26.1.2'
 description: Write anonymous unsent messages rendered as in-game maps.
@@ -25,6 +25,11 @@ commands:
     usage: /unsentadmin whitelist <add|remove|list|reload> [block|hand]
     permission: unsent.admin
     aliases: []
+  unsentreload:
+    description: Reload config.yml and whitelist.yml from disk.
+    usage: /unsentreload
+    permission: unsent.admin
+    aliases: []
 
 permissions:
   unsent.use:
@@ -38,4 +43,7 @@ permissions:
     default: op
   unsent.unlimited:
     description: Bypass the per-player message (map) limit.
+    default: op
+  unsent.color:
+    description: Choose a custom background colour for your notes.
     default: op

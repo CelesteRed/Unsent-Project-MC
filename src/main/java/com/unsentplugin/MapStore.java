@@ -33,11 +33,12 @@ public class MapStore {
     }
 
     /** Records (or overwrites) the note data for a map id so its renderer can be rebuilt later. */
-    public void record(int mapId, String recipient, String message, long timestamp) {
+    public void record(int mapId, String recipient, String message, long timestamp, int backgroundRgb) {
         String base = "maps." + mapId;
         cfg.set(base + ".recipient", recipient);
         cfg.set(base + ".message", message);
         cfg.set(base + ".timestamp", timestamp);
+        cfg.set(base + ".background", backgroundRgb);
         save();
     }
 
@@ -71,7 +72,8 @@ public class MapStore {
             String recipient = maps.getString(key + ".recipient", "");
             String message   = maps.getString(key + ".message", "");
             long timestamp   = maps.getLong(key + ".timestamp", 0L);
-            MapFactory.applyUnsentRenderer(view, recipient, message, timestamp);
+            int backgroundRgb = maps.getInt(key + ".background", 0xFFFFFF); // default white for older entries
+            MapFactory.applyUnsentRenderer(view, recipient, message, timestamp, new java.awt.Color(backgroundRgb));
             restored++;
         }
 

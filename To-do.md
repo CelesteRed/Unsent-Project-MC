@@ -149,7 +149,7 @@ Four related features. Each can reasonably ship as its own version (suggest one 
 **⚠️ Some of the requirements conflict or need a decision — see "Decisions to confirm" at the bottom
 before writing any code.**
 
-### 5A — Verify the recipient is a real Minecraft account (via an API)
+### 5A — Verify the recipient is a real Minecraft account (via an API) — ✅ DONE (v1.11.0)
 
 **Goal:** When a player runs `/unsent <name> <message>`, confirm `<name>` is an actual Minecraft
 username before creating the note; reject unknown names.

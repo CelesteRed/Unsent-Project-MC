@@ -22,15 +22,26 @@ public class UnsentMapRenderer extends MapRenderer {
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("MM/dd/yy").withZone(ZoneId.systemDefault());
 
+    // Subtle watermark shown in the bottom-left corner of every note.
+    private static final String WATERMARK = "[Mc Project Unsent]";
+
     private final String recipientName;
     private final String message;
     private final long timestamp;
+    private final Color background;
     private boolean rendered = false;
 
-    public UnsentMapRenderer(String recipientName, String message, long timestamp) {
+    public UnsentMapRenderer(String recipientName, String message, long timestamp, Color background) {
         this.recipientName = recipientName;
         this.message       = message;
         this.timestamp     = timestamp;
+        this.background     = background != null ? background : Color.WHITE;
+    }
+
+    /** True if the colour is dark enough that text on it should be light. */
+    private static boolean isDark(Color c) {
+        double luminance = 0.299 * c.getRed() + 0.587 * c.getGreen() + 0.114 * c.getBlue();
+        return luminance < 128;
     }
 
     @Override
@@ -42,33 +53,36 @@ public class UnsentMapRenderer extends MapRenderer {
         BufferedImage img = new BufferedImage(MAP_SIZE, MAP_SIZE, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
 
-        // White background
-        g.setColor(Color.WHITE);
+        // Background (player-chosen, default white). Text colours adapt for contrast.
+        boolean darkBg = isDark(background);
+        Color fg    = darkBg ? Color.WHITE : Color.BLACK;
+        Color faint = darkBg ? new Color(255, 255, 255, 140) : new Color(0, 0, 0, 140);
+
+        g.setColor(background);
         g.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
 
         // Thin border
-        g.setColor(new Color(220, 220, 220));
+        g.setColor(faint);
         g.drawRect(0, 0, MAP_SIZE - 1, MAP_SIZE - 1);
 
         // Enable antialiasing for nicer text
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setColor(Color.BLACK);
 
         // ── "to [Name]" header ────────────────────────────────────────────
         Font headerFont = new Font("SansSerif", Font.ITALIC, 9);
         g.setFont(headerFont);
-        FontMetrics headerFm = g.getFontMetrics();
+        g.setColor(fg);
         String header = "to " + recipientName + ",";
         g.drawString(header, 6, 14);
 
         // Separator line
-        g.setColor(new Color(180, 180, 180));
+        g.setColor(faint);
         g.drawLine(6, 17, MAP_SIZE - 6, 17);
-        g.setColor(Color.BLACK);
 
         // ── Message body ──────────────────────────────────────────────────
         Font bodyFont = new Font("SansSerif", Font.PLAIN, 8);
         g.setFont(bodyFont);
+        g.setColor(fg);
         FontMetrics bodyFm = g.getFontMetrics();
 
         List<String> lines = wrapText(message, bodyFm, MAP_SIZE - 12);
@@ -82,14 +96,18 @@ public class UnsentMapRenderer extends MapRenderer {
 
         // ── Date footer (mm/dd/yy) ─────────────────────────────────────────
         if (timestamp > 0) {
-            Font dateFont = new Font("SansSerif", Font.PLAIN, 7);
-            g.setFont(dateFont);
-            g.setColor(new Color(150, 150, 150));
+            g.setFont(new Font("SansSerif", Font.PLAIN, 7));
+            g.setColor(faint);
             String date = DATE_FMT.format(Instant.ofEpochMilli(timestamp));
             FontMetrics dateFm = g.getFontMetrics();
             int dateX = MAP_SIZE - 6 - dateFm.stringWidth(date);
             g.drawString(date, dateX, MAP_SIZE - 5);
         }
+
+        // ── Watermark (bottom-left) ────────────────────────────────────────
+        g.setFont(new Font("SansSerif", Font.PLAIN, 6));
+        g.setColor(faint);
+        g.drawString(WATERMARK, 4, MAP_SIZE - 4);
 
         g.dispose();
 

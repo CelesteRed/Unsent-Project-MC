@@ -13,6 +13,7 @@ import org.bukkit.map.MapView;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import java.awt.Color;
 import java.util.List;
 
 public class MapFactory {
@@ -32,7 +33,7 @@ public class MapFactory {
      * a map is first created and when restoring renderers on startup (see {@link MapStore}).
      */
     public static void applyUnsentRenderer(MapView mapView, String recipientName,
-                                           String message, long timestamp) {
+                                           String message, long timestamp, Color background) {
         mapView.setScale(MapView.Scale.NORMAL);
         mapView.setTrackingPosition(false);
         mapView.setUnlimitedTracking(false);
@@ -42,18 +43,18 @@ public class MapFactory {
             mapView.removeRenderer(r);
         }
 
-        mapView.addRenderer(new UnsentMapRenderer(recipientName, message, timestamp));
+        mapView.addRenderer(new UnsentMapRenderer(recipientName, message, timestamp, background));
     }
 
     public static ItemStack createMap(UnsentPlugin plugin, World world, String recipientName,
-                                      String message, long timestamp) {
+                                      String message, long timestamp, Color background) {
         // Create a new MapView and attach our custom renderer
         MapView mapView = Bukkit.createMap(world);
-        applyUnsentRenderer(mapView, recipientName, message, timestamp);
+        applyUnsentRenderer(mapView, recipientName, message, timestamp, background);
 
         // Remember this map so its renderer can be restored after a server restart
         // (runtime renderers are not persisted with the world — see MapStore).
-        plugin.getMapStore().record(mapView.getId(), recipientName, message, timestamp);
+        plugin.getMapStore().record(mapView.getId(), recipientName, message, timestamp, background.getRGB() & 0xFFFFFF);
 
         // Build the item
         ItemStack item = new ItemStack(Material.FILLED_MAP);
@@ -73,9 +74,9 @@ public class MapFactory {
      * tag/name/lore — so even maps created before the registry existed can be brought back.
      */
     public static void restoreMap(UnsentPlugin plugin, ItemStack item, MapView mapView,
-                                  String recipientName, String message, long timestamp) {
-        applyUnsentRenderer(mapView, recipientName, message, timestamp);
-        plugin.getMapStore().record(mapView.getId(), recipientName, message, timestamp);
+                                  String recipientName, String message, long timestamp, Color background) {
+        applyUnsentRenderer(mapView, recipientName, message, timestamp, background);
+        plugin.getMapStore().record(mapView.getId(), recipientName, message, timestamp, background.getRGB() & 0xFFFFFF);
 
         item.editMeta(MapMeta.class, meta -> {
             meta.setMapView(mapView);

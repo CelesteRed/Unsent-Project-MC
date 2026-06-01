@@ -8,12 +8,19 @@ A Minecraft Paper plugin inspired by [The Unsent Project](https://unsentproject.
 - `/unsentread <name>` — reads all saved messages for a name in chat
 - `/unsentrecover <name> [number]` — (admin) rebuilds the note on a held map from stored messages
 - `/unsentadmin whitelist <add|remove|list|reload> [block|hand]` — (admin) manage the placement whitelist; `hand` uses the held block
+- `/unsentreload` — (admin) reload `config.yml` and `whitelist.yml` from disk without a restart
 - White-background map with handwritten-style text rendering
 - Built-in word filter with 80+ blocked words/phrases
 - Optional **AI moderation** (OpenAI) as a second layer to catch filter bypasses — tuned for 13+
+- Optional **real-username validation** — only accept recipients that are real Minecraft accounts (multi-API failover)
+- Tab-complete recipient names from online **and** previously-joined players
+- `unsent.color` lets players pick a custom **background colour** (hex) for their note, with adaptive text contrast
+- Duplicate notes are rejected — the same message can't be sent to the same name twice (anti-flood)
+- **Note credits**: start with 1, earn one every week (configurable duration), shown as an "Unsent Note" paper item in your inventory
 - Per-player message limit (`max-messages-per-player`) and creation cooldown (`creation-cooldown-seconds`), both bypassed by `unsent.unlimited`
 - Placed maps are sealed in item frames (can't be popped out, broken, or rotated)
-- Map placement restricted to whitelisted wall blocks (`whitelist.yml`) — no floor/ceiling frames
+- Right-click a wall block with a note to hang it — the plugin spawns the item frame for you
+- Placement restricted to whitelisted wall blocks (`whitelist.yml`) — no floor/ceiling, no other blocks
 - Messages saved to YAML files per name (`plugins/UnsentPlugin/messages/`)
 - Namespaced commands (`/unsentplugin:unsent`) are intentionally disabled
 
@@ -24,7 +31,7 @@ A Minecraft Paper plugin inspired by [The Unsent Project](https://unsentproject.
 
 ## Installation
 
-1. Drop `UnsentPlugin-1.8.0.jar` into your server's `plugins/` folder
+1. Drop `UnsentPlugin-1.13.1.jar` into your server's `plugins/` folder
 2. Restart the server
 3. Done — no configuration needed
 
@@ -36,7 +43,7 @@ Requires **JDK 25+** and **Maven 3.8+**.
 git clone https://github.com/YOUR_USERNAME/UnsentPlugin.git
 cd UnsentPlugin
 mvn package
-# Output jar: target/UnsentPlugin-1.8.0.jar
+# Output jar: target/UnsentPlugin-1.13.1.jar
 ```
 
 ## Configuration
@@ -78,12 +85,52 @@ The check runs asynchronously (off the main thread); players see a brief *"Check
 message…"* while it resolves. The word filter always runs first, so AI calls only happen for
 messages that already passed it.
 
+### Username validation (optional)
+
+When enabled, `/unsent` only accepts a recipient that is a **real Minecraft account**. The name is
+checked against a configurable, ordered list of provider APIs — the first to answer decides, and if
+one is down the next is tried (failover):
+
+```yaml
+username-validation:
+  enabled: true
+  fail-closed: true          # reject if ALL providers are unreachable
+  cache-ttl-minutes: 1440
+  timeout-seconds: 6
+  providers:                 # tried in order; built-ins: mojang, mojang-services, playerdb, ashcon
+    - mojang
+    - playerdb
+    - ashcon
+```
+
+Off by default (so offline-mode / creative servers aren't affected). Results are cached per name to
+respect rate limits. The check runs asynchronously alongside AI moderation.
+
+`/unsent <name>` also tab-completes from online **and** previously-joined offline players, so you
+rarely need to type a full name.
+
 ### Map placement whitelist
 
-`plugins/UnsentPlugin/whitelist.yml` is an **allow-list** of block materials a map may be placed
-on (in a wall-mounted item frame). Only blocks listed there accept a map; placing on any other
-block — or on a floor/ceiling frame — is blocked and the map stays in the player's hand. Players
-with `unsent.admin` bypass the restriction.
+To hang a note, a player **right-clicks a wall block** while holding the map — the plugin spawns an
+**invisible** wall-mounted item frame, drops the note into it, and takes one map from the player. The
+hidden frame makes the note appear to float on the wall. Once placed, a note can't be popped out,
+broken, or rotated by non-admins.
+
+`plugins/UnsentPlugin/whitelist.yml` is an **allow-list** of blocks a note may be hung on. It
+**starts empty** — no blocks are added for you, so nothing can be placed until you add the blocks
+you want. Only listed blocks accept a note; right-clicking any other block — or a floor/ceiling
+face — is refused with *"This note can't be placed here."* and the map stays in hand. Players with
+`unsent.admin` bypass the restriction. (Functional blocks like chests/doors still work normally
+while holding a note — sneak-right-click to place on those.)
+
+Edit the list two ways, both applied live with no restart:
+
+```text
+/unsentadmin whitelist add hand        # add the block you're holding
+/unsentadmin whitelist remove hand     # remove it
+# …or edit whitelist.yml by hand, then:
+/unsentreload                          # re-read config.yml + whitelist.yml from disk
+```
 
 Manage the list in-game with `/unsentadmin whitelist`:
 
@@ -104,7 +151,8 @@ You can also edit `whitelist.yml` directly (it's never auto-merged, so removed b
 | `unsent.use` | everyone | Use `/unsent` |
 | `unsent.read` | everyone | Use `/unsentread` |
 | `unsent.unlimited` | op | Bypass the `max-messages-per-player` limit |
-| `unsent.admin` | op | Admin access — bypass frame protection, `/unsentrecover` |
+| `unsent.color` | op | Choose a custom background colour for your notes |
+| `unsent.admin` | op | Admin access — bypass frame protection, `/unsentrecover`, `/unsentadmin` |
 
 ## License
 
