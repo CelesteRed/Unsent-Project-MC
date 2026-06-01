@@ -7,11 +7,13 @@ A Minecraft Paper plugin inspired by [The Unsent Project](https://unsentproject.
 - `/unsent <name> <message>` — writes your message and gives you a map item
 - `/unsentread <name>` — reads all saved messages for a name in chat
 - `/unsentrecover <name> [number]` — (admin) rebuilds the note on a held map from stored messages
+- `/unsentadmin whitelist <add|remove|list|reload> [block|hand]` — (admin) manage the placement whitelist; `hand` uses the held block
 - White-background map with handwritten-style text rendering
 - Built-in word filter with 80+ blocked words/phrases
 - Optional **AI moderation** (OpenAI) as a second layer to catch filter bypasses — tuned for 13+
 - Per-player message limit (`max-messages-per-player`) and creation cooldown (`creation-cooldown-seconds`), both bypassed by `unsent.unlimited`
 - Placed maps are sealed in item frames (can't be popped out, broken, or rotated)
+- Map placement restricted to whitelisted wall blocks (`whitelist.yml`) — no floor/ceiling frames
 - Messages saved to YAML files per name (`plugins/UnsentPlugin/messages/`)
 - Namespaced commands (`/unsentplugin:unsent`) are intentionally disabled
 
@@ -22,7 +24,7 @@ A Minecraft Paper plugin inspired by [The Unsent Project](https://unsentproject.
 
 ## Installation
 
-1. Drop `UnsentPlugin-1.6.2.jar` into your server's `plugins/` folder
+1. Drop `UnsentPlugin-1.8.0.jar` into your server's `plugins/` folder
 2. Restart the server
 3. Done — no configuration needed
 
@@ -34,7 +36,7 @@ Requires **JDK 25+** and **Maven 3.8+**.
 git clone https://github.com/YOUR_USERNAME/UnsentPlugin.git
 cd UnsentPlugin
 mvn package
-# Output jar: target/UnsentPlugin-1.6.2.jar
+# Output jar: target/UnsentPlugin-1.8.0.jar
 ```
 
 ## Configuration
@@ -75,6 +77,25 @@ ai-moderation:
 The check runs asynchronously (off the main thread); players see a brief *"Checking your
 message…"* while it resolves. The word filter always runs first, so AI calls only happen for
 messages that already passed it.
+
+### Map placement whitelist
+
+`plugins/UnsentPlugin/whitelist.yml` is an **allow-list** of block materials a map may be placed
+on (in a wall-mounted item frame). Only blocks listed there accept a map; placing on any other
+block — or on a floor/ceiling frame — is blocked and the map stays in the player's hand. Players
+with `unsent.admin` bypass the restriction.
+
+Manage the list in-game with `/unsentadmin whitelist`:
+
+```text
+/unsentadmin whitelist add hand        # add the block you're holding (WorldEdit-style)
+/unsentadmin whitelist add STONE       # add by material name
+/unsentadmin whitelist remove hand     # remove the held block
+/unsentadmin whitelist list            # show the current whitelist
+/unsentadmin whitelist reload          # re-read whitelist.yml after editing by hand
+```
+
+You can also edit `whitelist.yml` directly (it's never auto-merged, so removed blocks stay removed).
 
 ## Permissions
 

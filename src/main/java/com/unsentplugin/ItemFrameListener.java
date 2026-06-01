@@ -1,6 +1,10 @@
 package com.unsentplugin;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Material;
 import org.bukkit.Rotation;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
@@ -19,7 +23,8 @@ import org.bukkit.persistence.PersistentDataType;
  * rotated, nor can the frame be removed (by a player, mob, projectile, explosion, or by breaking
  * the block it hangs on), so the note stays exactly as it was hung. The frame's rotation is also
  * reset to upright the moment a map is placed, so a pre-rotated frame can't lock the note facing
- * sideways. Players with {@code unsent.admin} bypass the protection for moderation/cleanup.
+ * sideways. Maps may only be placed on a whitelisted wall block (see {@link BlockWhitelist}) — not
+ * on floors/ceilings or other blocks. Players with {@code unsent.admin} bypass the protection.
  */
 public class ItemFrameListener implements Listener {
 
@@ -74,16 +79,42 @@ public class ItemFrameListener implements Listener {
             return;
         }
 
-        // Empty frame + player placing our map → straighten it once the map lands in the frame.
+        // Empty frame + player placing our map → enforce the placement whitelist, then straighten.
         ItemStack current = frame.getItem();
         boolean empty = current == null || current.getType().isAir();
         if (empty && isUnsentMap(itemInHand(event.getPlayer(), event.getHand()))) {
+            if (!canBypass(event.getPlayer())) {
+                String deny = placementDenyReason(frame);
+                if (deny != null) {
+                    event.setCancelled(true); // map is never consumed, so it stays in the player's hand
+                    event.getPlayer().sendMessage(Component.text(deny).color(NamedTextColor.RED));
+                    return;
+                }
+            }
+            // Allowed → reset rotation to upright once the map lands in the frame.
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 if (frame.isValid() && isUnsentMap(frame.getItem())) {
                     frame.setRotation(Rotation.NONE);
                 }
             });
         }
+    }
+
+    /**
+     * Reason a map may NOT be placed in this frame, or {@code null} if placement is allowed.
+     * Disallows floor/ceiling frames and any frame whose supporting block isn't whitelisted.
+     */
+    private String placementDenyReason(ItemFrame frame) {
+        BlockFace facing = frame.getFacing();
+        if (facing == BlockFace.UP || facing == BlockFace.DOWN) {
+            return "Unsent maps can't be placed on floors or ceilings — hang it on a wall.";
+        }
+        // The supporting block sits opposite the way the frame faces.
+        Material support = frame.getLocation().getBlock().getRelative(facing.getOppositeFace()).getType();
+        if (!plugin.getBlockWhitelist().isAllowed(support)) {
+            return "Unsent maps can't be placed on that block.";
+        }
+        return null;
     }
 
     /** The item the player is interacting with, from whichever hand triggered the event. */

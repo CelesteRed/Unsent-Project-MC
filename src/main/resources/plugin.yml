@@ -1,5 +1,5 @@
 name: UnsentPlugin
-version: '1.6.2'
+version: '1.8.0'
 main: com.unsentplugin.UnsentPlugin
 api-version: '26.1.2'
 description: Write anonymous unsent messages rendered as in-game maps.
@@ -20,6 +20,11 @@ commands:
     usage: /unsentrecover <name> [number]
     permission: unsent.admin
     aliases: []
+  unsentadmin:
+    description: Admin tools — manage the map placement whitelist.
+    usage: /unsentadmin whitelist <add|remove|list|reload> [block|hand]
+    permission: unsent.admin
+    aliases: []
 
 permissions:
   unsent.use:
@@ -29,7 +34,7 @@ permissions:
     description: Allows reading unsent messages.
     default: true
   unsent.admin:
-    description: Admin access (clear messages, bypass filter).
+    description: Admin tools (/unsentadmin, /unsentrecover) and bypass placement/frame protection.
     default: op
   unsent.unlimited:
     description: Bypass the per-player message (map) limit.

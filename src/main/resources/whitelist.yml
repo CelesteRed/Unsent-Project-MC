@@ -1,0 +1,52 @@
+# UnsentPlugin — map placement whitelist
+#
+# Blocks an unsent map is ALLOWED to be placed on (in a wall-mounted item frame).
+# This is an allow-list: ONLY the blocks listed here may hold a map. Trying to place a
+# map on any other block — or on a floor/ceiling frame (one facing up or down) — is blocked.
+#
+# Use Bukkit material names (https://hub.spigotmc.org/javadocs/bukkit/org/bukkit/Material.html).
+# Unknown names are ignored with a warning in the console. This file is yours to curate;
+# it is NOT auto-merged on update, so blocks you remove stay removed.
+allowed-blocks:
+  # Planks
+  - OAK_PLANKS
+  - SPRUCE_PLANKS
+  - BIRCH_PLANKS
+  - JUNGLE_PLANKS
+  - ACACIA_PLANKS
+  - DARK_OAK_PLANKS
+  - MANGROVE_PLANKS
+  - CHERRY_PLANKS
+  - BAMBOO_PLANKS
+  - CRIMSON_PLANKS
+  - WARPED_PLANKS
+  # Stone family
+  - STONE
+  - SMOOTH_STONE
+  - COBBLESTONE
+  - STONE_BRICKS
+  - MOSSY_STONE_BRICKS
+  - CRACKED_STONE_BRICKS
+  - CHISELED_STONE_BRICKS
+  - ANDESITE
+  - POLISHED_ANDESITE
+  - DIORITE
+  - POLISHED_DIORITE
+  - GRANITE
+  - POLISHED_GRANITE
+  # Deepslate
+  - COBBLED_DEEPSLATE
+  - POLISHED_DEEPSLATE
+  - DEEPSLATE_BRICKS
+  - DEEPSLATE_TILES
+  # Bricks / quartz / sandstone
+  - BRICKS
+  - QUARTZ_BLOCK
+  - SMOOTH_QUARTZ
+  - CHISELED_QUARTZ_BLOCK
+  - SANDSTONE
+  - SMOOTH_SANDSTONE
+  - RED_SANDSTONE
+  - SMOOTH_RED_SANDSTONE
+  # Decorative
+  - BOOKSHELF

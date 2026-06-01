@@ -167,16 +167,36 @@ checked against Mojang (directly or via a wrapper).
 | PlayerDB | `playerdb.co/api/player/minecraft/<name>` | Friendly JSON wrapper with a `success` flag; caches upstream. |
 | Ashcon | `api.ashcon.app/mojang/v2/user/<name>` | Wrapper; 404 when missing; also returns UUID/skin. |
 
+**✅ Decided:** support a **configurable, ordered list of APIs** and **fail over** — if the first
+provider is down/errors, try the next, and so on.
+
 **Approach:**
 - Async HTTP — reuse the `AiModerator` pattern (`HttpClient` off-thread → hop back to main thread).
-- New `UsernameValidator` class; **cache** positive/negative results (TTL) to respect rate limits.
+- New `UsernameValidator` class that walks the configured provider list **in order** until one gives
+  a definitive answer (exists / doesn't exist). A provider that errors or times out is skipped and
+  the next is tried. Only if **all** providers fail is it treated as "couldn't verify".
+- Built-in providers identified by name (each with its own known request + response parsing, since
+  every API returns a different shape): `mojang`, `mojang-services`, `playerdb`, `ashcon`. Consider
+  also allowing a custom entry with a URL template (`{name}`) — but note generic existence-detection
+  is unreliable, so built-in named providers are the safe core.
+- **Cache** positive/negative results (TTL) to respect rate limits and reduce calls.
 - Cheap pre-check first with the existing `isValidName` regex (consider tightening to Mojang's
   3–16 `[A-Za-z0-9_]`).
-- Config block, e.g. `username-validation`: `enabled`, `fail-closed` (reject vs allow on API error),
-  `cache-ttl`. Likely **off by default** so offline-mode / creative servers aren't broken.
-- Edge cases: offline-mode servers, name changes, API downtime, recipient who never joined here.
+- Config block, e.g.:
+  ```yaml
+  username-validation:
+    enabled: false            # off by default so offline-mode / creative servers aren't broken
+    fail-closed: true         # after ALL providers fail: reject (true) or allow (false)
+    cache-ttl-minutes: 1440
+    providers:                # tried in order, first definitive answer wins
+      - mojang
+      - playerdb
+      - ashcon
+  ```
+- Edge cases: offline-mode servers, name changes, every provider down at once, recipient who never
+  joined here.
 
-### 5B — Restrict where maps can be placed (whitelist of blocks; no floor/ceiling)
+### 5B — Restrict where maps can be placed (whitelist of blocks; no floor/ceiling) — ✅ DONE (v1.7.0)
 
 **Goal:** A new `whitelist.yml` in the plugin folder lists the block materials that ARE allowed to
 hold an unsent map. Placing a map into an item frame is only permitted when (a) the block the frame
@@ -194,9 +214,8 @@ rejected**.
   - on reject: cancel the interaction so the map stays in hand, and send a message.
 - Edge cases: maps placed before this existed, creative mode, possible `unsent.admin` bypass.
 
-**⚠️ Wording conflict:** the request says both "placed anywhere **but** blacklisted blocks" and a
-"whitelist … blocks that ARE allowed." Planned here as a **whitelist** (allow-list). Confirm whether
-you want allow-list only, allow-everywhere-except-a-blacklist, or both.
+**✅ Decided:** **whitelist (allow-list) model** — only blocks listed in `whitelist.yml` may hold a
+map; everything else (and all floor/ceiling frames) is rejected.
 
 ### 5C — Polish chat output with MiniMessage
 
@@ -209,29 +228,47 @@ you want allow-list only, allow-everywhere-except-a-blacklist, or both.
 - Refactor user-facing text in `UnsentCommand`, `ReadCommand`, `RecoverCommand`, and the new admin
   command to MiniMessage. Keep it tasteful and readable.
 
-### 5D — Per-user moderation log + `/unsentadmin inspect <user>`
+### 5D — Per-user moderation log + `/unsentadmin inspect` (two modes)
 
-**Goal:** Record each player's activity so an admin can review it. `/unsentadmin inspect <user>`
-shows that user's **sent** messages AND their **flagged** messages — ones blocked by the word filter
-or AI moderation that were never sent.
+**Goal:** Record each player's activity so an admin can review it, in **two ways**:
+1. **`/unsentadmin inspect <user>`** — print that user's **sent** messages AND their **flagged**
+   messages (blocked by the word filter or AI, never sent).
+2. **`/unsentadmin inspect`** (no args) — toggle **inspect mode**: while it's on, an admin
+   right-clicking a placed item-frame map sees **who wrote it and when**. Admins only.
 
-**Approach:**
+**Approach (the log):**
 - Log keyed by the **sender's** account (UUID + cached name), not the recipient.
 - New `UserLog` store (e.g. `users/<uuid>.yml`, or a single `user-log.yml`) with entries like
   `{type: SENT|FLAGGED, recipient, message, reason, timestamp}`, where `reason` ∈ word-filter /
   ai-moderation.
 - Hook points in `UnsentCommand`: on a successful send → log `SENT`; when the word filter or AI
   blocks a message → log `FLAGGED` with the reason and the attempted text.
-- New `AdminCommand` for `/unsentadmin <subcommand>` (start with `inspect`), permission
-  `unsent.admin`; declare in `plugin.yml`. Resolve `<user>` → UUID (online player, the cache, or 5A).
+
+**Approach (click-to-inspect):**
+- **Store the author** so a placed map can reveal it. Extend `MapStore` to also record the writer's
+  UUID + name (and creation time) keyed by map id — keeping authorship **server-side** (preferred
+  over the item's PDC, which players with NBT access could read; the notes are otherwise anonymous).
+- Track which admins are in inspect mode in an in-memory `Set<UUID>` (cleared on quit). Add a toggle
+  via `/unsentadmin inspect` with no user.
+- In `ItemFrameListener` (the interact handler), if the clicker is in inspect mode and the frame
+  holds an unsent map: look up the author by the map's id and send "Written by <name> on <date>";
+  **cancel the interaction** so it doesn't rotate/do anything else while inspecting. This must take
+  priority over the normal admin rotate-bypass.
+- Edge case: maps created before authorship was stored (no author on record) → show "unknown".
+
+**Command + rendering:**
+- New `AdminCommand` for `/unsentadmin <subcommand>` (`inspect`), permission `unsent.admin`; declare
+  in `plugin.yml`. Resolve `<user>` → UUID (online player, the cache, or 5A).
 - Render with MiniMessage (ties into 5C). Consider paging when a user has many entries.
 
-### ⚠️ Decisions to confirm before implementing
-1. **5B:** whitelist (allow-list) vs blacklist vs both? *(planned: whitelist.)*
-2. **5A:** default on or off? reject-or-allow on API failure? tighten names to Mojang's 3–16 rule?
-   grandfather existing free-form names?
-3. **5D:** confirm `inspect <user>` means the *sender's* sent + flagged activity *(assumed yes)*.
-4. Ship order / versioning — suggest one feature per version (5A → 5D).
+### Decisions
+1. **5B model:** ✅ whitelist (allow-list) of blocks.
+2. **5A failover:** ✅ ordered list of providers in config, tried until one gives a definitive
+   answer. Default **off**; `fail-closed` after *all* providers fail.
+   *(Still open: tighten names to Mojang's 3–16 rule? grandfather existing free-form recipient names?)*
+3. **5D inspect:** ✅ two modes — `inspect <user>` (sender's sent + flagged log) and `inspect`
+   (toggle click-to-inspect on placed frames, showing author + date). Both gated by `unsent.admin`.
+4. **Ship order:** suggested one feature per version (5A → 5D) — confirm when we start.
 
 ---
 

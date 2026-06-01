@@ -11,6 +11,7 @@ public class UnsentPlugin extends JavaPlugin {
     private MapStore mapStore;
     private PlayerStore playerStore;
     private AiModerator aiModerator;
+    private BlockWhitelist blockWhitelist;
 
     @Override
     public void onEnable() {
@@ -20,11 +21,12 @@ public class UnsentPlugin extends JavaPlugin {
         File dataFolder = getDataFolder();
         if (!dataFolder.exists()) dataFolder.mkdirs();
 
-        messageStore = new MessageStore(this);
-        wordFilter   = new WordFilter(this);
-        mapStore     = new MapStore(this);
-        playerStore  = new PlayerStore(this);
-        aiModerator  = new AiModerator(this);
+        messageStore   = new MessageStore(this);
+        wordFilter     = new WordFilter(this);
+        mapStore       = new MapStore(this);
+        playerStore    = new PlayerStore(this);
+        aiModerator    = new AiModerator(this);
+        blockWhitelist = new BlockWhitelist(this);
 
         if (getConfig().getBoolean("ai-moderation.enabled", false) && !aiModerator.isEnabled()) {
             getLogger().warning("ai-moderation is enabled but no api-key is set — AI checks are inactive "
@@ -34,6 +36,7 @@ public class UnsentPlugin extends JavaPlugin {
         UnsentCommand  unsentCmd  = new UnsentCommand(this);
         ReadCommand    readCmd    = new ReadCommand(this);
         RecoverCommand recoverCmd = new RecoverCommand(this);
+        AdminCommand   adminCmd   = new AdminCommand(this);
 
         getCommand("unsent").setExecutor(unsentCmd);
         getCommand("unsent").setTabCompleter(unsentCmd);
@@ -41,6 +44,8 @@ public class UnsentPlugin extends JavaPlugin {
         getCommand("unsentread").setTabCompleter(readCmd);
         getCommand("unsentrecover").setExecutor(recoverCmd);
         getCommand("unsentrecover").setTabCompleter(recoverCmd);
+        getCommand("unsentadmin").setExecutor(adminCmd);
+        getCommand("unsentadmin").setTabCompleter(adminCmd);
 
         getServer().getPluginManager().registerEvents(new ItemFrameListener(this), this);
 
@@ -59,9 +64,10 @@ public class UnsentPlugin extends JavaPlugin {
         getLogger().info("UnsentPlugin disabled.");
     }
 
-    public MessageStore getMessageStore() { return messageStore; }
-    public WordFilter   getWordFilter()   { return wordFilter;   }
-    public MapStore     getMapStore()     { return mapStore;     }
-    public PlayerStore  getPlayerStore()  { return playerStore;  }
-    public AiModerator  getAiModerator()  { return aiModerator;  }
+    public MessageStore  getMessageStore()  { return messageStore;  }
+    public WordFilter    getWordFilter()    { return wordFilter;    }
+    public MapStore      getMapStore()      { return mapStore;      }
+    public PlayerStore   getPlayerStore()   { return playerStore;   }
+    public AiModerator   getAiModerator()   { return aiModerator;   }
+    public BlockWhitelist getBlockWhitelist() { return blockWhitelist; }
 }
