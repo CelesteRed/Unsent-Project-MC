@@ -22,8 +22,8 @@ import java.util.List;
  */
 public class VipCommand implements CommandExecutor, TabCompleter {
 
-    private static final int MIN_SIZE = 10;
-    private static final int MAX_SIZE = 24;
+    private static final int MIN_SIZE = 12;
+    private static final int MAX_SIZE = 32;
 
     private final UnsentPlugin plugin;
     private final UnsentCommand unsentCommand;
@@ -44,7 +44,7 @@ public class VipCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 4) {
-            player.sendMessage(Component.text("Usage: /unsentvip <name> <size 10-24> <#hexcolor> <message>").color(NamedTextColor.RED));
+            player.sendMessage(Component.text("Usage: /unsentvip <name> <size 12-32> <colour> <message>").color(NamedTextColor.RED));
             return true;
         }
 
@@ -104,7 +104,7 @@ public class VipCommand implements CommandExecutor, TabCompleter {
             return UnsentCommand.suggestNames(plugin, args[0]);
         }
         if (args.length == 2) {
-            return List.of("10", "12", "14", "16", "20", "24").stream()
+            return List.of("12", "16", "20", "24", "28", "32").stream()
                     .filter(s -> s.startsWith(args[1])).toList();
         }
         if (args.length == 3) {

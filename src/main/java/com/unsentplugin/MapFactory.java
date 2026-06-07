@@ -49,8 +49,8 @@ public class MapFactory {
             mapView.removeRenderer(r);
         }
 
-        // Clamp the font size so a wild value can't break the 128px layout.
-        int clamped = Math.max(5, Math.min(24, fontSize));
+        // Clamp the font size to the supported range (12–32).
+        int clamped = Math.max(12, Math.min(32, fontSize));
         mapView.addRenderer(new UnsentMapRenderer(recipientName, message, timestamp, background, clamped));
     }
 

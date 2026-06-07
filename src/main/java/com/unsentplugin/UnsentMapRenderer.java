@@ -23,7 +23,7 @@ public class UnsentMapRenderer extends MapRenderer {
             DateTimeFormatter.ofPattern("MM/dd/yy").withZone(ZoneId.systemDefault());
 
     // Subtle watermark shown in the bottom-left corner of every note.
-    private static final String WATERMARK = "[Mc Project Unsent]";
+    private static final String WATERMARK = "[join.anson.live]";
 
     private final String recipientName;
     private final String message;
@@ -70,18 +70,21 @@ public class UnsentMapRenderer extends MapRenderer {
         // Enable antialiasing for nicer text
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        // ── "to [Name]" header (always size 10; only the body scales) ──────
-        Font headerFont = MapFont.derive(Font.ITALIC, 10f);
+        // ── "to [Name]" header (size 16) ───────────────────────────────────
+        Font headerFont = MapFont.derive(Font.ITALIC, 16f);
         g.setFont(headerFont);
+        FontMetrics headerFm = g.getFontMetrics();
         g.setColor(fg);
         String header = "to " + recipientName + ",";
-        g.drawString(header, 6, 14);
+        int headerBaseline = 2 + headerFm.getAscent();
+        g.drawString(header, 6, headerBaseline);
 
-        // Separator line
+        // Separator line, just below the header.
+        int separatorY = headerBaseline + headerFm.getDescent() + 2;
         g.setColor(faint);
-        g.drawLine(6, 17, MAP_SIZE - 6, 17);
+        g.drawLine(6, separatorY, MAP_SIZE - 6, separatorY);
 
-        // ── Message body (centred, kept below the header) ──────────────────
+        // ── Message body (left-aligned, top-down, kept below the header) ────
         Font bodyFont = MapFont.derive(Font.PLAIN, bodyFontSize);
         g.setFont(bodyFont);
         g.setColor(fg);
@@ -90,11 +93,10 @@ public class UnsentMapRenderer extends MapRenderer {
         List<String> lines = wrapText(message, bodyFm, MAP_SIZE - 12);
 
         int lineHeight = bodyFm.getHeight();
-        int areaBottom = MAP_SIZE - 18;   // leave room for the date/watermark footer
-        // Start the first line just below the separator. Because the baseline is measured from the
-        // font's ascent, the TOP of the text is always at areaTop (21) no matter how big the font
-        // is — so the body can never reach the header. Left-aligned, flowing top-down.
-        int areaTop = 21;
+        int areaBottom = MAP_SIZE - 19;   // leave room for the single-line footer
+        // Start just below the separator. Because the baseline is measured from the font's ascent,
+        // the TOP of the body is always at areaTop regardless of font size — it can never reach the header.
+        int areaTop = separatorY + 3;
         int baseline = areaTop + bodyFm.getAscent();
 
         for (String line : lines) {
@@ -103,20 +105,22 @@ public class UnsentMapRenderer extends MapRenderer {
             baseline += lineHeight;
         }
 
-        // ── Date footer (mm/dd/yy) ─────────────────────────────────────────
-        if (timestamp > 0) {
-            g.setFont(MapFont.derive(Font.PLAIN, 7f));
-            g.setColor(faint);
-            String date = DATE_FMT.format(Instant.ofEpochMilli(timestamp));
-            FontMetrics dateFm = g.getFontMetrics();
-            int dateX = MAP_SIZE - 6 - dateFm.stringWidth(date);
-            g.drawString(date, dateX, MAP_SIZE - 5);
+        // ── Footer: "[watermark]  date" on one line, auto-sized to fit (≤14) ──
+        String footerText = WATERMARK;
+        if (timestamp > 0) footerText += "  " + DATE_FMT.format(Instant.ofEpochMilli(timestamp));
+
+        float footerSize = 14f;
+        g.setFont(MapFont.derive(Font.PLAIN, footerSize));
+        FontMetrics footerFm = g.getFontMetrics();
+        while (footerSize > 6f && footerFm.stringWidth(footerText) > MAP_SIZE - 8) {
+            footerSize -= 1f;
+            g.setFont(MapFont.derive(Font.PLAIN, footerSize));
+            footerFm = g.getFontMetrics();
         }
 
-        // ── Watermark (bottom-left) ────────────────────────────────────────
-        g.setFont(MapFont.derive(Font.PLAIN, 6f));
         g.setColor(faint);
-        g.drawString(WATERMARK, 4, MAP_SIZE - 4);
+        int footerX = Math.max(4, (MAP_SIZE - footerFm.stringWidth(footerText)) / 2); // centred
+        g.drawString(footerText, footerX, MAP_SIZE - 4);
 
         g.dispose();
 

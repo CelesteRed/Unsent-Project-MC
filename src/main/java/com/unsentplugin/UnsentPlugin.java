@@ -59,6 +59,7 @@ public class UnsentPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ItemFrameListener(this), this);
         getServer().getPluginManager().registerEvents(new NoteVoucherListener(this), this);
         getServer().getPluginManager().registerEvents(new NoteItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new WelcomeListener(this), this);
 
         // Regenerate note credits and refresh each online player's voucher once a minute.
         getServer().getScheduler().runTaskTimer(this, () -> {

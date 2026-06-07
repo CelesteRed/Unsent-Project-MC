@@ -79,6 +79,14 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
+        // Recipient opt-out: names on the blacklist can't receive notes (case-insensitive).
+        for (String blocked : plugin.getConfig().getStringList("user-blacklist")) {
+            if (blocked.equalsIgnoreCase(name)) {
+                player.sendMessage(Component.text("That player doesn't want notes at the moment").color(NamedTextColor.RED));
+                return;
+            }
+        }
+
         int maxLen = plugin.getConfig().getInt("max-message-length", 80);
         if (message.length() > maxLen) {
             player.sendMessage(Component.text("Your message is too long (max " + maxLen + " characters).").color(NamedTextColor.RED));
@@ -195,8 +203,28 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
+        boolean creditsEnabled = plugin.getConfig().getBoolean("note-credits.enabled", true);
+        boolean unlimited = player.hasPermission("unsent.unlimited");
+
+        // FIX: Spend the credit and sync the voucher BEFORE touching the map/inventory.
+        // NoteVoucher.sync() calls setContents() on the entire inventory array — if we called
+        // it after addItem(map), that setContents() would overwrite the slot the map just
+        // occupied, silently deleting it on the server side while the client still showed it.
+        if (!unlimited) {
+            if (creditsEnabled) {
+                plugin.getPlayerStore().spendCredit(player.getUniqueId());
+                NoteVoucher.sync(plugin, player); // inventory is now stable — no map in it yet
+            } else {
+                plugin.getPlayerStore().incrementMessageCount(player.getUniqueId());
+            }
+        }
+
         // Stamp once so the stored value and the value rendered on the map match exactly.
         long now = System.currentTimeMillis();
+
+        // FIX: Create the map before saving to MessageStore. If createMap() throws, we haven't
+        // written a phantom record that would permanently block the player via the duplicate check.
+        ItemStack map = MapFactory.createMap(plugin, player.getWorld(), name, message, now, background, fontSize);
 
         boolean saved = plugin.getMessageStore().save(name, message, now);
         if (!saved) {
@@ -204,8 +232,7 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        ItemStack map = MapFactory.createMap(plugin, player.getWorld(), name, message, now, background, fontSize);
-
+        // Inventory is stable — safe to add the map now.
         if (player.getInventory().firstEmpty() == -1) {
             player.getWorld().dropItemNaturally(player.getLocation(), map);
             player.sendMessage(Component.text("Your inventory was full — your map dropped at your feet.").color(NamedTextColor.YELLOW));
@@ -213,27 +240,14 @@ public class UnsentCommand implements CommandExecutor, TabCompleter {
             player.getInventory().addItem(map);
         }
 
-        // Account for the note: spend a credit (and refresh the voucher) or count it toward the
-        // flat limit. Unlimited players are exempt.
-        boolean creditsEnabled = plugin.getConfig().getBoolean("note-credits.enabled", true);
-        boolean unlimited = player.hasPermission("unsent.unlimited");
-        if (!unlimited) {
-            if (creditsEnabled) {
-                plugin.getPlayerStore().spendCredit(player.getUniqueId());
-                NoteVoucher.sync(plugin, player);
-            } else {
-                plugin.getPlayerStore().incrementMessageCount(player.getUniqueId());
-            }
-        }
-
         // Start the creation cooldown from this successful map.
         lastCreation.put(player.getUniqueId(), System.currentTimeMillis());
 
         player.sendMessage(
-            Component.text("Your message to ")
-                     .color(NamedTextColor.GRAY)
-                .append(Component.text(name).color(NamedTextColor.WHITE))
-                .append(Component.text(" has been sealed into a map.").color(NamedTextColor.GRAY))
+                Component.text("Your message to ")
+                        .color(NamedTextColor.GRAY)
+                        .append(Component.text(name).color(NamedTextColor.WHITE))
+                        .append(Component.text(" has been sealed into a map.").color(NamedTextColor.GRAY))
         );
 
         if (creditsEnabled && !unlimited) {

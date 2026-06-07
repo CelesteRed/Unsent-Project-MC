@@ -211,9 +211,9 @@ username-validation:
 
 # Map appearance
 map:
-  # Default body text size for /unsent notes (clamped 5–24). The "to <name>" header is always 10.
-  # Players with unsent.color use /unsentvip to pick a size (10–24) and hex background per note.
-  font-size: 10
+  # Default body text size for /unsent notes (clamped 12–32). The "to <name>" header is size 16.
+  # Players with unsent.color use /unsentvip to pick a size (12–32) and a colour per note.
+  font-size: 16
   # Font used to draw the note. To use a custom (e.g. Minecraft) font, drop a TrueType file at
   # plugins/UnsentPlugin/font.ttf — it takes priority. Otherwise this names a system font family;
   # if that isn't installed it falls back to SansSerif.
@@ -234,8 +234,30 @@ colors:
   black: "#000000"
   gray: "#AAAAAA"
 
+# Usernames that cannot receive notes. /unsent to a name on this list is refused with
+# "That player doesn't want notes at the moment". Case-insensitive. Edit, then /unsentreload.
+# Example:
+#   user-blacklist:
+#     - "Celeste"
+#     - "SomePlayer"
+user-blacklist: []
+
+# ── Welcome message ──────────────────────────────────────────────────────────
+# Shown to each player when they join. Uses MiniMessage formatting
+# (https://docs.advntr.dev/minimessage/format.html). Set enabled to false to turn it off.
+# Each list entry is one line; {name} and {message} are just literal text in the command hint.
+welcome:
+  enabled: true
+  message:
+    - "<dark_gray><st>                                                  </st></dark_gray>"
+    - "<gradient:#ff9ed6:#a98cff><b>Welcome to the Unsent Project</b></gradient> <gray>in Minecraft</gray>"
+    - "<gray>Leave an anonymous note for someone special. To get started:</gray>"
+    - "  <click:suggest_command:'/unsent '><hover:show_text:'<gray>Click to begin your note</gray>'><white><b>/unsent</b> <gray>{name} {message}</gray></white></hover></click>"
+    - "<i><dark_gray>Perhaps that someone will see it...</dark_gray></i>"
+    - "<dark_gray><st>                                                  </st></dark_gray>"
+
 # ── Do not edit below ────────────────────────────────────────────────────────
 # Records the plugin version this config was generated for. On startup the plugin
 # compares it to the version it ships with and, if they differ, merges in any new
 # options (keeping your settings) and re-stamps this value. Leave it alone.
-config-version: '1.15.0'
+config-version: '1.17.0'

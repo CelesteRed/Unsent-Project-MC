@@ -1,5 +1,5 @@
 name: UnsentPlugin
-version: '1.15.4'
+version: '1.17.0'
 main: com.unsentplugin.UnsentPlugin
 api-version: '26.1.2'
 description: Write anonymous unsent messages rendered as in-game maps.
@@ -31,8 +31,8 @@ commands:
     permission: unsent.admin
     aliases: []
   unsentvip:
-    description: Send a note with a custom text size (10-24) and background colour.
-    usage: /unsentvip <name> <size 10-24> <#hexcolor> <message>
+    description: Send a note with a custom text size (12-32) and background colour.
+    usage: /unsentvip <name> <size 12-32> <colour> <message>
     permission: unsent.color
     aliases: []
 
